@@ -1,0 +1,90 @@
+module Logistics where
+
+import Daml.Script
+
+template ShipmentProposal
+  with
+    shipper : Party
+    carrier : Party
+    details : Text
+    price : Decimal
+  where
+    signatory shipper
+    observer carrier
+
+    choice Accept : ContractId Shipment
+      controller carrier
+      do
+        create Shipment with
+          shipper = shipper
+          carrier = carrier
+          details = details
+          price = price
+
+    choice Reject : ()
+      controller carrier
+      do
+        pure ()
+
+template Shipment
+  with
+    shipper : Party
+    carrier : Party
+    details : Text
+    price : Decimal
+  where
+    signatory shipper, carrier
+
+    choice CreateInvoice : ContractId Invoice
+      controller carrier
+      do
+        create Invoice with
+          shipper = shipper
+          carrier = carrier
+          amount = price
+          details = details
+          isPaid = False
+
+template Invoice
+  with
+    shipper : Party
+    carrier : Party
+    amount : Decimal
+    details : Text
+    isPaid : Bool
+  where
+    signatory carrier, shipper
+
+    choice MarkPaid : ContractId Invoice
+      controller shipper
+      do
+        assertMsg "Invoice is already paid" (not isPaid)
+        create this with isPaid = True
+
+
+-- TEST SENARYOSU
+testLogistics = script do
+  shipper <- allocateParty "Shipper"
+  carrier <- allocateParty "Carrier"
+
+  -- 1. Shipper bir sevkiyat önerisi oluşturur
+  proposalId <- submit shipper do
+    createCmd ShipmentProposal with
+      shipper = shipper
+      carrier = carrier
+      details = "20ft Container - Electronics from Istanbul to Ankara"
+      price = 5000.0
+
+  -- 2. Carrier öneriyi kabul eder, Shipment oluşur
+  shipmentId <- submit carrier do
+    exerciseCmd proposalId Accept
+
+  -- 3. Carrier teslimat sonrası fatura keser
+  invoiceId <- submit carrier do
+    exerciseCmd shipmentId CreateInvoice
+
+  -- 4. Shipper faturayı öder
+  submit shipper do
+    exerciseCmd invoiceId MarkPaid
+
+  pure ()
