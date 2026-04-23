@@ -1,61 +1,219 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
+
+// ═══════════════════════════════════════════════════════════
+// CANTON LEDGER CONFIG
+// ═══════════════════════════════════════════════════════════
+
+const API_BASE = ''
+
+const SHIPPER = 'Shipper::12207e3a535ddc13b2b1c12be49f6657791b74184f3eebc4ddecd3a9d7f6d83f87ed'
+const CARRIER = 'Carrier::12207e3a535ddc13b2b1c12be49f6657791b74184f3eebc4ddecd3a9d7f6d83f87ed'
+
+// ═══════════════════════════════════════════════════════════
+// LEDGER API CLIENT
+// ═══════════════════════════════════════════════════════════
+
+// Generate unique command ID
+const cmdId = () => `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+// Get latest ledger offset
+async function getLedgerEnd() {
+  const res = await fetch(`${API_BASE}/v2/state/ledger-end`)
+  const data = await res.json()
+  return data.offset
+}
+
+// Query active contracts as a given party
+async function queryContracts(asParty) {
+  const offset = await getLedgerEnd()
+  const res = await fetch(`${API_BASE}/v2/state/active-contracts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filter: {
+        filtersByParty: {
+          [asParty]: {
+            cumulative: [{
+              identifierFilter: {
+                WildcardFilter: { value: { includeCreatedEventBlob: false } }
+              }
+            }]
+          }
+        }
+      },
+      verbose: true,
+      activeAtOffset: offset
+    })
+  })
+  const data = await res.json()
+  return data || []
+}
+
+// Submit a command (create or exercise)
+async function submitCommand(asParty, commands) {
+  const res = await fetch(`${API_BASE}/v2/commands/submit-and-wait`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: 'chainfreight',
+      commandId: cmdId(),
+      actAs: [asParty],
+      commands
+    })
+  })
+  const data = await res.json()
+  if (!data.updateId) {
+    throw new Error(data.errors?.[0] || JSON.stringify(data))
+  }
+  return data
+}
+
+// Parse ledger contract into friendly UI object
+function parseContract(entry) {
+  const ev = entry.contractEntry?.JsActiveContract?.createdEvent
+  if (!ev) return null
+  const templateName = ev.templateId.split(':').pop()
+  return {
+    contractId: ev.contractId,
+    template: templateName,
+    fields: ev.createArgument
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════
 
 function App() {
   const [activeTab, setActiveTab] = useState('shipper')
-  const [proposals, setProposals] = useState([])
-  const [shipments, setShipments] = useState([])
-  const [invoices, setInvoices] = useState([])
+  const [shipperContracts, setShipperContracts] = useState([])
+  const [carrierContracts, setCarrierContracts] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  // Shipper yeni proposal oluşturur
-  const createProposal = (details, price) => {
-    const newProposal = {
-      id: Date.now(),
-      shipper: 'Murat Lojistik A.Ş.',
-      carrier: 'Hızlı Taşımacılık Ltd.',
-      details,
-      price,
-      status: 'pending'
+  // Fetch contracts from ledger
+  async function refresh() {
+    try {
+      setError(null)
+      const [sData, cData] = await Promise.all([
+        queryContracts(SHIPPER),
+        queryContracts(CARRIER)
+      ])
+      setShipperContracts(sData.map(parseContract).filter(Boolean))
+      setCarrierContracts(cData.map(parseContract).filter(Boolean))
+    } catch (e) {
+      setError(`Ledger error: ${e.message}`)
     }
-    setProposals([...proposals, newProposal])
   }
 
-  // Carrier proposal'ı kabul eder → Shipment olur
-  const acceptProposal = (proposalId) => {
-    const proposal = proposals.find(p => p.id === proposalId)
-    const newShipment = { ...proposal, id: Date.now(), status: 'accepted' }
-    setShipments([...shipments, newShipment])
-    setProposals(proposals.filter(p => p.id !== proposalId))
-  }
+  useEffect(() => {
+    refresh()
+    const id = setInterval(refresh, 3000)
+    return () => clearInterval(id)
+  }, [])
 
-  // Carrier invoice oluşturur
-  const createInvoice = (shipmentId) => {
-    const shipment = shipments.find(s => s.id === shipmentId)
-    const newInvoice = {
-      id: Date.now(),
-      shipper: shipment.shipper,
-      carrier: shipment.carrier,
-      details: shipment.details,
-      amount: shipment.price,
-      isPaid: false
+  // ─── ACTIONS ──────────────────────────────────────────────
+
+  async function createProposal(details, price) {
+    setLoading(true)
+    try {
+      await submitCommand(SHIPPER, [{
+        CreateCommand: {
+          templateId: '#chainfreight:Logistics:ShipmentProposal',
+          createArguments: {
+            shipper: SHIPPER,
+            carrier: CARRIER,
+            details,
+            price: price.toString()
+          }
+        }
+      }])
+      await refresh()
+    } catch (e) {
+      setError(`Create failed: ${e.message}`)
+    } finally {
+      setLoading(false)
     }
-    setInvoices([...invoices, newInvoice])
-    setShipments(shipments.filter(s => s.id !== shipmentId))
   }
 
-  // Shipper invoice'u öder
-  const markPaid = (invoiceId) => {
-    setInvoices(invoices.map(inv =>
-      inv.id === invoiceId ? { ...inv, isPaid: true } : inv
-    ))
+  async function acceptProposal(contractId) {
+    setLoading(true)
+    try {
+      await submitCommand(CARRIER, [{
+        ExerciseCommand: {
+          templateId: '#chainfreight:Logistics:ShipmentProposal',
+          contractId,
+          choice: 'Accept',
+          choiceArgument: {}
+        }
+      }])
+      await refresh()
+    } catch (e) {
+      setError(`Accept failed: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
+
+  async function createInvoice(contractId) {
+    setLoading(true)
+    try {
+      await submitCommand(CARRIER, [{
+        ExerciseCommand: {
+          templateId: '#chainfreight:Logistics:Shipment',
+          contractId,
+          choice: 'CreateInvoice',
+          choiceArgument: {}
+        }
+      }])
+      await refresh()
+    } catch (e) {
+      setError(`Create invoice failed: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function markPaid(contractId) {
+    setLoading(true)
+    try {
+      await submitCommand(SHIPPER, [{
+        ExerciseCommand: {
+          templateId: '#chainfreight:Logistics:Invoice',
+          contractId,
+          choice: 'MarkPaid',
+          choiceArgument: {}
+        }
+      }])
+      await refresh()
+    } catch (e) {
+      setError(`Mark paid failed: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ─── FILTER CONTRACTS ─────────────────────────────────────
+
+  const proposals = shipperContracts.filter(c => c.template === 'ShipmentProposal')
+  const proposalsForCarrier = carrierContracts.filter(c => c.template === 'ShipmentProposal')
+  const shipments = carrierContracts.filter(c => c.template === 'Shipment')
+  const invoices = shipperContracts.filter(c => c.template === 'Invoice')
+
+  // ─── RENDER ───────────────────────────────────────────────
 
   return (
     <div className="app">
       <header>
-        <h1>⚓ Canton Logistics</h1>
-        <p>Tamper-proof shipment & invoice workflow on Canton Network</p>
+        <h1>⚓ ChainFreight</h1>
+        <p>Live on Canton Network — tamper-proof shipment & invoice workflow</p>
+        <div className="ledger-status">
+          🟢 Connected to Canton ledger via JSON API
+        </div>
       </header>
+
+      {error && <div className="error-banner">{error}</div>}
 
       <nav className="tabs">
         <button
@@ -80,66 +238,83 @@ function App() {
 
       <main>
         {activeTab === 'shipper' && (
-          <ShipperPanel proposals={proposals} createProposal={createProposal} />
+          <ShipperPanel
+            proposals={proposals}
+            onCreate={createProposal}
+            loading={loading}
+          />
         )}
         {activeTab === 'carrier' && (
           <CarrierPanel
-            proposals={proposals}
+            proposals={proposalsForCarrier}
             shipments={shipments}
-            acceptProposal={acceptProposal}
-            createInvoice={createInvoice}
+            onAccept={acceptProposal}
+            onCreateInvoice={createInvoice}
+            loading={loading}
           />
         )}
         {activeTab === 'invoice' && (
-          <InvoicePanel invoices={invoices} markPaid={markPaid} />
+          <InvoicePanel
+            invoices={invoices}
+            onMarkPaid={markPaid}
+            loading={loading}
+          />
         )}
       </main>
     </div>
   )
 }
 
-// SHIPPER PANELİ
-function ShipperPanel({ proposals, createProposal }) {
+// ═══════════════════════════════════════════════════════════
+// SHIPPER PANEL
+// ═══════════════════════════════════════════════════════════
+
+function ShipperPanel({ proposals, onCreate, loading }) {
   const [details, setDetails] = useState('')
   const [price, setPrice] = useState('')
 
   const handleSubmit = () => {
     if (!details || !price) return
-    createProposal(details, parseFloat(price))
+    onCreate(details, parseFloat(price))
     setDetails('')
     setPrice('')
   }
 
   return (
     <div className="panel">
-      <h2>Yeni Sevkiyat Önerisi Oluştur</h2>
+      <h2>Create New Shipment Proposal</h2>
       <div className="form">
         <input
           type="text"
-          placeholder="Sevkiyat detayı (örn: 20ft Konteyner - İstanbul → Ankara)"
+          placeholder="Shipment details (e.g. 20ft Container - Istanbul → Ankara)"
           value={details}
           onChange={(e) => setDetails(e.target.value)}
+          disabled={loading}
         />
         <input
           type="number"
-          placeholder="Fiyat (TL)"
+          placeholder="Price (USD)"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
+          disabled={loading}
         />
-        <button onClick={handleSubmit}>Öneri Gönder</button>
+        <button onClick={handleSubmit} disabled={loading}>
+          {loading ? 'Submitting...' : 'Send Proposal'}
+        </button>
       </div>
 
-      <h3>Bekleyen Önerilerim ({proposals.length})</h3>
+      <h3>My Pending Proposals ({proposals.length})</h3>
       <div className="list">
-        {proposals.length === 0 && <p className="empty">Henüz öneri yok.</p>}
+        {proposals.length === 0 && <p className="empty">No proposals yet.</p>}
         {proposals.map(p => (
-          <div key={p.id} className="card pending">
+          <div key={p.contractId} className="card pending">
             <div className="card-header">
-              <strong>{p.details}</strong>
-              <span className="badge">⏳ Bekliyor</span>
+              <strong>{p.fields.details}</strong>
+              <span className="badge">⏳ Pending</span>
             </div>
-            <p>Taşıyıcı: {p.carrier}</p>
-            <p>Fiyat: {p.price.toLocaleString('tr-TR')} TL</p>
+            <p>Carrier: FastFreight Ltd.</p>
+            <p>Price: ${parseFloat(p.fields.price).toLocaleString('en-US')}</p>
+            <p className="ledger-id">⛓ Contract: {p.contractId.slice(0, 20)}...</p>
           </div>
         ))}
       </div>
@@ -147,38 +322,47 @@ function ShipperPanel({ proposals, createProposal }) {
   )
 }
 
-// CARRIER PANELİ
-function CarrierPanel({ proposals, shipments, acceptProposal, createInvoice }) {
+// ═══════════════════════════════════════════════════════════
+// CARRIER PANEL
+// ═══════════════════════════════════════════════════════════
+
+function CarrierPanel({ proposals, shipments, onAccept, onCreateInvoice, loading }) {
   return (
     <div className="panel">
-      <h2>Gelen Öneriler ({proposals.length})</h2>
+      <h2>Incoming Proposals ({proposals.length})</h2>
       <div className="list">
-        {proposals.length === 0 && <p className="empty">Bekleyen öneri yok.</p>}
+        {proposals.length === 0 && <p className="empty">No pending proposals.</p>}
         {proposals.map(p => (
-          <div key={p.id} className="card pending">
+          <div key={p.contractId} className="card pending">
             <div className="card-header">
-              <strong>{p.details}</strong>
-              <span className="badge">⏳ Yeni</span>
+              <strong>{p.fields.details}</strong>
+              <span className="badge">⏳ New</span>
             </div>
-            <p>Gönderici: {p.shipper}</p>
-            <p>Fiyat: {p.price.toLocaleString('tr-TR')} TL</p>
-            <button onClick={() => acceptProposal(p.id)}>✅ Kabul Et</button>
+            <p>Shipper: Murat Logistics Inc.</p>
+            <p>Price: ${parseFloat(p.fields.price).toLocaleString('en-US')}</p>
+            <p className="ledger-id">⛓ Contract: {p.contractId.slice(0, 20)}...</p>
+            <button onClick={() => onAccept(p.contractId)} disabled={loading}>
+              {loading ? 'Processing...' : '✅ Accept'}
+            </button>
           </div>
         ))}
       </div>
 
-      <h2>Aktif Sevkiyatlar ({shipments.length})</h2>
+      <h2>Active Shipments ({shipments.length})</h2>
       <div className="list">
-        {shipments.length === 0 && <p className="empty">Aktif sevkiyat yok.</p>}
+        {shipments.length === 0 && <p className="empty">No active shipments.</p>}
         {shipments.map(s => (
-          <div key={s.id} className="card active">
+          <div key={s.contractId} className="card active">
             <div className="card-header">
-              <strong>{s.details}</strong>
-              <span className="badge success">✅ Kabul Edildi</span>
+              <strong>{s.fields.details}</strong>
+              <span className="badge success">✅ Accepted</span>
             </div>
-            <p>Gönderici: {s.shipper}</p>
-            <p>Tutar: {s.price.toLocaleString('tr-TR')} TL</p>
-            <button onClick={() => createInvoice(s.id)}>📄 Fatura Oluştur</button>
+            <p>Shipper: Murat Logistics Inc.</p>
+            <p>Amount: ${parseFloat(s.fields.price).toLocaleString('en-US')}</p>
+            <p className="ledger-id">⛓ Contract: {s.contractId.slice(0, 20)}...</p>
+            <button onClick={() => onCreateInvoice(s.contractId)} disabled={loading}>
+              {loading ? 'Processing...' : '📄 Create Invoice'}
+            </button>
           </div>
         ))}
       </div>
@@ -186,29 +370,38 @@ function CarrierPanel({ proposals, shipments, acceptProposal, createInvoice }) {
   )
 }
 
-// INVOICE PANELİ
-function InvoicePanel({ invoices, markPaid }) {
+// ═══════════════════════════════════════════════════════════
+// INVOICE PANEL
+// ═══════════════════════════════════════════════════════════
+
+function InvoicePanel({ invoices, onMarkPaid, loading }) {
   return (
     <div className="panel">
-      <h2>Faturalar ({invoices.length})</h2>
+      <h2>Invoices ({invoices.length})</h2>
       <div className="list">
-        {invoices.length === 0 && <p className="empty">Henüz fatura yok.</p>}
-        {invoices.map(inv => (
-          <div key={inv.id} className={`card ${inv.isPaid ? 'paid' : 'unpaid'}`}>
-            <div className="card-header">
-              <strong>{inv.details}</strong>
-              <span className={`badge ${inv.isPaid ? 'success' : 'warning'}`}>
-                {inv.isPaid ? '✅ Ödendi' : '⏳ Beklemede'}
-              </span>
+        {invoices.length === 0 && <p className="empty">No invoices yet.</p>}
+        {invoices.map(inv => {
+          const paid = inv.fields.isPaid === true || inv.fields.isPaid === 'true'
+          return (
+            <div key={inv.contractId} className={`card ${paid ? 'paid' : 'unpaid'}`}>
+              <div className="card-header">
+                <strong>{inv.fields.details}</strong>
+                <span className={`badge ${paid ? 'success' : 'warning'}`}>
+                  {paid ? '✅ Paid' : '⏳ Pending'}
+                </span>
+              </div>
+              <p>Shipper: Murat Logistics Inc.</p>
+              <p>Carrier: FastFreight Ltd.</p>
+              <p className="amount">${parseFloat(inv.fields.amount).toLocaleString('en-US')}</p>
+              <p className="ledger-id">⛓ Contract: {inv.contractId.slice(0, 20)}...</p>
+              {!paid && (
+                <button onClick={() => onMarkPaid(inv.contractId)} disabled={loading}>
+                  {loading ? 'Processing...' : '💳 Mark as Paid'}
+                </button>
+              )}
             </div>
-            <p>Gönderici: {inv.shipper}</p>
-            <p>Taşıyıcı: {inv.carrier}</p>
-            <p className="amount">{inv.amount.toLocaleString('tr-TR')} TL</p>
-            {!inv.isPaid && (
-              <button onClick={() => markPaid(inv.id)}>💳 Ödeme Yap</button>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
