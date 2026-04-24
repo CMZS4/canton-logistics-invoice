@@ -2,29 +2,30 @@ import { useState, useEffect } from 'react'
 import './App.css'
 
 // ═══════════════════════════════════════════════════════════
-// CANTON LEDGER CONFIG
+// CONFIG
 // ═══════════════════════════════════════════════════════════
 
 const API_BASE = ''
-
-const SHIPPER = 'Shipper::12207e3a535ddc13b2b1c12be49f6657791b74184f3eebc4ddecd3a9d7f6d83f87ed'
-const CARRIER = 'Carrier::12207e3a535ddc13b2b1c12be49f6657791b74184f3eebc4ddecd3a9d7f6d83f87ed'
+const STORAGE_KEY = 'chainfreight_role'
 
 // ═══════════════════════════════════════════════════════════
 // LEDGER API CLIENT
 // ═══════════════════════════════════════════════════════════
 
-// Generate unique command ID
 const cmdId = () => `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-// Get latest ledger offset
+async function fetchParties() {
+  const res = await fetch(`${API_BASE}/v2/parties`)
+  const data = await res.json()
+  return data.partyDetails || []
+}
+
 async function getLedgerEnd() {
   const res = await fetch(`${API_BASE}/v2/state/ledger-end`)
   const data = await res.json()
   return data.offset
 }
 
-// Query active contracts as a given party
 async function queryContracts(asParty) {
   const offset = await getLedgerEnd()
   const res = await fetch(`${API_BASE}/v2/state/active-contracts`, {
@@ -50,7 +51,6 @@ async function queryContracts(asParty) {
   return data || []
 }
 
-// Submit a command (create or exercise)
 async function submitCommand(asParty, commands) {
   const res = await fetch(`${API_BASE}/v2/commands/submit-and-wait`, {
     method: 'POST',
@@ -69,7 +69,6 @@ async function submitCommand(asParty, commands) {
   return data
 }
 
-// Parse ledger contract into friendly UI object
 function parseContract(entry) {
   const ev = entry.contractEntry?.JsActiveContract?.createdEvent
   if (!ev) return null
@@ -81,49 +80,160 @@ function parseContract(entry) {
   }
 }
 
+// Short display name from party ID
+function shortenParty(partyId) {
+  if (!partyId) return ''
+  const [hint] = partyId.split('::')
+  return hint
+}
+
+// ═══════════════════════════════════════════════════════════
+// ROLE SELECTOR (login screen)
+// ═══════════════════════════════════════════════════════════
+
+function RoleSelector({ onSelect }) {
+  const [parties, setParties] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    fetchParties()
+      .then(list => {
+        // filter out system party (starts with "sandbox::")
+        const user = list.filter(p => !p.party.startsWith('sandbox::'))
+        setParties(user)
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const byHint = (hint) => parties.find(p => p.party.startsWith(hint + '::'))
+
+  const shipper = byHint('Shipper')
+  const carrier = byHint('Carrier')
+
+  return (
+    <div className="role-screen">
+      <div className="role-box">
+        <h1>⚓ ChainFreight</h1>
+        <p className="role-sub">Select your role to continue</p>
+
+        {loading && <p className="empty">Loading parties from ledger…</p>}
+        {error && <div className="error-banner">Could not reach ledger: {error}</div>}
+
+        {!loading && !error && (
+          <>
+            {(!shipper || !carrier) && (
+              <div className="error-banner">
+                Parties not found. Run the setup curl commands from README first.
+              </div>
+            )}
+
+            <div className="role-cards">
+              <button
+                className="role-card"
+                disabled={!shipper}
+                onClick={() => shipper && onSelect({ role: 'shipper', partyId: shipper.party })}
+              >
+                <div className="role-icon">🏢</div>
+                <div className="role-title">Shipper</div>
+                <div className="role-company">Murat Logistics Inc.</div>
+                <div className="role-id">
+                  {shipper ? `ID: ${shipper.party.slice(0, 24)}…` : 'Not provisioned'}
+                </div>
+              </button>
+
+              <button
+                className="role-card"
+                disabled={!carrier}
+                onClick={() => carrier && onSelect({ role: 'carrier', partyId: carrier.party })}
+              >
+                <div className="role-icon">🚚</div>
+                <div className="role-title">Carrier</div>
+                <div className="role-company">FastFreight Ltd.</div>
+                <div className="role-id">
+                  {carrier ? `ID: ${carrier.party.slice(0, 24)}…` : 'Not provisioned'}
+                </div>
+              </button>
+            </div>
+          </>
+        )}
+
+        <div className="ledger-status" style={{ marginTop: '24px' }}>
+          🟢 Connected to Canton ledger via JSON API
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ═══════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════
 
 function App() {
-  const [activeTab, setActiveTab] = useState('shipper')
-  const [shipperContracts, setShipperContracts] = useState([])
-  const [carrierContracts, setCarrierContracts] = useState([])
+  const [session, setSession] = useState(() => {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  })
+  const [counterparty, setCounterparty] = useState(null)
+  const [activeTab, setActiveTab] = useState('main')
+  const [contracts, setContracts] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Fetch contracts from ledger
+  // Persist session
+  useEffect(() => {
+    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+    else localStorage.removeItem(STORAGE_KEY)
+  }, [session])
+
+  // Resolve counterparty from ledger whenever role changes
+  useEffect(() => {
+    if (!session) return
+    fetchParties().then(list => {
+      const other = list.find(p => {
+        const wantedHint = session.role === 'shipper' ? 'Carrier' : 'Shipper'
+        return p.party.startsWith(wantedHint + '::')
+      })
+      if (other) setCounterparty(other.party)
+    })
+  }, [session])
+
+  // Refresh active contracts
   async function refresh() {
+    if (!session) return
     try {
       setError(null)
-      const [sData, cData] = await Promise.all([
-        queryContracts(SHIPPER),
-        queryContracts(CARRIER)
-      ])
-      setShipperContracts(sData.map(parseContract).filter(Boolean))
-      setCarrierContracts(cData.map(parseContract).filter(Boolean))
+      const data = await queryContracts(session.partyId)
+      setContracts(data.map(parseContract).filter(Boolean))
     } catch (e) {
       setError(`Ledger error: ${e.message}`)
     }
   }
 
   useEffect(() => {
+    if (!session) return
     refresh()
     const id = setInterval(refresh, 3000)
     return () => clearInterval(id)
-  }, [])
+  }, [session])
 
   // ─── ACTIONS ──────────────────────────────────────────────
 
   async function createProposal(details, price) {
+    if (!counterparty) {
+      setError('Carrier not found on ledger')
+      return
+    }
     setLoading(true)
     try {
-      await submitCommand(SHIPPER, [{
+      await submitCommand(session.partyId, [{
         CreateCommand: {
           templateId: '#chainfreight:Logistics:ShipmentProposal',
           createArguments: {
-            shipper: SHIPPER,
-            carrier: CARRIER,
+            shipper: session.partyId,
+            carrier: counterparty,
             details,
             price: price.toString()
           }
@@ -140,7 +250,7 @@ function App() {
   async function acceptProposal(contractId) {
     setLoading(true)
     try {
-      await submitCommand(CARRIER, [{
+      await submitCommand(session.partyId, [{
         ExerciseCommand: {
           templateId: '#chainfreight:Logistics:ShipmentProposal',
           contractId,
@@ -159,7 +269,7 @@ function App() {
   async function createInvoice(contractId) {
     setLoading(true)
     try {
-      await submitCommand(CARRIER, [{
+      await submitCommand(session.partyId, [{
         ExerciseCommand: {
           templateId: '#chainfreight:Logistics:Shipment',
           contractId,
@@ -178,7 +288,7 @@ function App() {
   async function markPaid(contractId) {
     setLoading(true)
     try {
-      await submitCommand(SHIPPER, [{
+      await submitCommand(session.partyId, [{
         ExerciseCommand: {
           templateId: '#chainfreight:Logistics:Invoice',
           contractId,
@@ -194,20 +304,44 @@ function App() {
     }
   }
 
-  // ─── FILTER CONTRACTS ─────────────────────────────────────
-
-  const proposals = shipperContracts.filter(c => c.template === 'ShipmentProposal')
-  const proposalsForCarrier = carrierContracts.filter(c => c.template === 'ShipmentProposal')
-  const shipments = carrierContracts.filter(c => c.template === 'Shipment')
-  const invoices = shipperContracts.filter(c => c.template === 'Invoice')
+  function logout() {
+    setSession(null)
+    setContracts([])
+    setCounterparty(null)
+    setError(null)
+  }
 
   // ─── RENDER ───────────────────────────────────────────────
+
+  if (!session) {
+    return (
+      <RoleSelector
+        onSelect={(s) => { setSession(s); setActiveTab('main') }}
+      />
+    )
+  }
+
+  // Filter contracts by role
+  const proposals = contracts.filter(c => c.template === 'ShipmentProposal')
+  const shipments = contracts.filter(c => c.template === 'Shipment')
+  const invoices = contracts.filter(c => c.template === 'Invoice')
+
+  const isShipper = session.role === 'shipper'
+  const roleLabel = isShipper ? '🏢 Shipper — Murat Logistics' : '🚚 Carrier — FastFreight'
 
   return (
     <div className="app">
       <header>
-        <h1>⚓ ChainFreight</h1>
-        <p>Live on Canton Network — tamper-proof shipment & invoice workflow</p>
+        <div className="header-row">
+          <div>
+            <h1>⚓ ChainFreight</h1>
+            <p>Live on Canton Network — tamper-proof shipment & invoice workflow</p>
+          </div>
+          <div className="session-box">
+            <div className="session-role">{roleLabel}</div>
+            <button className="logout-btn" onClick={logout}>Switch role</button>
+          </div>
+        </div>
         <div className="ledger-status">
           🟢 Connected to Canton ledger via JSON API
         </div>
@@ -217,16 +351,10 @@ function App() {
 
       <nav className="tabs">
         <button
-          className={activeTab === 'shipper' ? 'active' : ''}
-          onClick={() => setActiveTab('shipper')}
+          className={activeTab === 'main' ? 'active' : ''}
+          onClick={() => setActiveTab('main')}
         >
-          🏢 Shipper Dashboard
-        </button>
-        <button
-          className={activeTab === 'carrier' ? 'active' : ''}
-          onClick={() => setActiveTab('carrier')}
-        >
-          🚚 Carrier Dashboard
+          {isShipper ? '🏢 My Shipments' : '🚚 Incoming & Active'}
         </button>
         <button
           className={activeTab === 'invoice' ? 'active' : ''}
@@ -237,16 +365,16 @@ function App() {
       </nav>
 
       <main>
-        {activeTab === 'shipper' && (
+        {activeTab === 'main' && isShipper && (
           <ShipperPanel
             proposals={proposals}
             onCreate={createProposal}
             loading={loading}
           />
         )}
-        {activeTab === 'carrier' && (
+        {activeTab === 'main' && !isShipper && (
           <CarrierPanel
-            proposals={proposalsForCarrier}
+            proposals={proposals}
             shipments={shipments}
             onAccept={acceptProposal}
             onCreateInvoice={createInvoice}
@@ -256,6 +384,7 @@ function App() {
         {activeTab === 'invoice' && (
           <InvoicePanel
             invoices={invoices}
+            isShipper={isShipper}
             onMarkPaid={markPaid}
             loading={loading}
           />
@@ -299,7 +428,7 @@ function ShipperPanel({ proposals, onCreate, loading }) {
           disabled={loading}
         />
         <button onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Submitting...' : 'Send Proposal'}
+          {loading ? 'Submitting…' : 'Send Proposal'}
         </button>
       </div>
 
@@ -314,7 +443,7 @@ function ShipperPanel({ proposals, onCreate, loading }) {
             </div>
             <p>Carrier: FastFreight Ltd.</p>
             <p>Price: ${parseFloat(p.fields.price).toLocaleString('en-US')}</p>
-            <p className="ledger-id">⛓ Contract: {p.contractId.slice(0, 20)}...</p>
+            <p className="ledger-id">⛓ Contract: {p.contractId.slice(0, 20)}…</p>
           </div>
         ))}
       </div>
@@ -340,9 +469,9 @@ function CarrierPanel({ proposals, shipments, onAccept, onCreateInvoice, loading
             </div>
             <p>Shipper: Murat Logistics Inc.</p>
             <p>Price: ${parseFloat(p.fields.price).toLocaleString('en-US')}</p>
-            <p className="ledger-id">⛓ Contract: {p.contractId.slice(0, 20)}...</p>
+            <p className="ledger-id">⛓ Contract: {p.contractId.slice(0, 20)}…</p>
             <button onClick={() => onAccept(p.contractId)} disabled={loading}>
-              {loading ? 'Processing...' : '✅ Accept'}
+              {loading ? 'Processing…' : '✅ Accept'}
             </button>
           </div>
         ))}
@@ -359,9 +488,9 @@ function CarrierPanel({ proposals, shipments, onAccept, onCreateInvoice, loading
             </div>
             <p>Shipper: Murat Logistics Inc.</p>
             <p>Amount: ${parseFloat(s.fields.price).toLocaleString('en-US')}</p>
-            <p className="ledger-id">⛓ Contract: {s.contractId.slice(0, 20)}...</p>
+            <p className="ledger-id">⛓ Contract: {s.contractId.slice(0, 20)}…</p>
             <button onClick={() => onCreateInvoice(s.contractId)} disabled={loading}>
-              {loading ? 'Processing...' : '📄 Create Invoice'}
+              {loading ? 'Processing…' : '📄 Create Invoice'}
             </button>
           </div>
         ))}
@@ -374,7 +503,7 @@ function CarrierPanel({ proposals, shipments, onAccept, onCreateInvoice, loading
 // INVOICE PANEL
 // ═══════════════════════════════════════════════════════════
 
-function InvoicePanel({ invoices, onMarkPaid, loading }) {
+function InvoicePanel({ invoices, isShipper, onMarkPaid, loading }) {
   return (
     <div className="panel">
       <h2>Invoices ({invoices.length})</h2>
@@ -393,11 +522,16 @@ function InvoicePanel({ invoices, onMarkPaid, loading }) {
               <p>Shipper: Murat Logistics Inc.</p>
               <p>Carrier: FastFreight Ltd.</p>
               <p className="amount">${parseFloat(inv.fields.amount).toLocaleString('en-US')}</p>
-              <p className="ledger-id">⛓ Contract: {inv.contractId.slice(0, 20)}...</p>
-              {!paid && (
+              <p className="ledger-id">⛓ Contract: {inv.contractId.slice(0, 20)}…</p>
+              {!paid && isShipper && (
                 <button onClick={() => onMarkPaid(inv.contractId)} disabled={loading}>
-                  {loading ? 'Processing...' : '💳 Mark as Paid'}
+                  {loading ? 'Processing…' : '💳 Mark as Paid'}
                 </button>
+              )}
+              {!paid && !isShipper && (
+                <p className="empty" style={{ textAlign: 'left' }}>
+                  Waiting for Shipper to pay…
+                </p>
               )}
             </div>
           )

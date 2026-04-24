@@ -270,4 +270,132 @@ header h1 {
 .tabs button {
   white-space: nowrap;
   font-size: 0.9rem;
+}/* ═══════════════════════════════════════════════════════════
+   ROLE SELECTOR
+   ═══════════════════════════════════════════════════════════ */
+
+.role-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.role-box {
+  max-width: 640px;
+  width: 100%;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.role-box h1 {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.role-sub {
+  color: #94a3b8;
+  margin-bottom: 28px;
+}
+
+.role-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.role-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 2px solid rgba(148, 163, 184, 0.15);
+  border-radius: 12px;
+  padding: 28px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.role-card:hover:not(:disabled) {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  transform: translateY(-2px);
+}
+
+.role-card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.role-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.role-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.role-company {
+  color: #94a3b8;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.role-id {
+  font-size: 11px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HEADER SESSION
+   ═══════════════════════════════════════════════════════════ */
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.session-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.session-role {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3b82f6;
+  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
 }
