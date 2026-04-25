@@ -13,6 +13,7 @@ import RoleSelector from './components/RoleSelector'
 import ShipperPanel from './components/ShipperPanel'
 import CarrierPanel from './components/CarrierPanel'
 import InvoicePanel from './components/InvoicePanel'
+import Dashboard from './components/Dashboard'
 
 const STORAGE_KEY = 'chainfreight_role'
 
@@ -233,7 +234,13 @@ function App() {
 
       {error && <div className="error-banner">{error}</div>}
 
-      <nav className="tabs">
+  <nav className="tabs">
+        <button
+          className={activeTab === 'dashboard' ? 'active' : ''}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          📊 Dashboard
+        </button>
         <button
           className={activeTab === 'main' ? 'active' : ''}
           onClick={() => setActiveTab('main')}
@@ -249,6 +256,9 @@ function App() {
       </nav>
 
       <main>
+        {activeTab === 'dashboard' && (
+          <Dashboard contracts={contracts} />
+        )}
         {activeTab === 'main' && isShipper && (
           <ShipperPanel
             proposals={proposals}
