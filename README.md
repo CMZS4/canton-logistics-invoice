@@ -80,6 +80,23 @@ Three Daml templates, all live on ledger:
 
 ---
 
+## Running Tests
+
+Daml smart contracts ship with a happy-path test suite:
+
+```bash
+daml test
+```
+
+Expected output:
+daml/Logistics.daml:testLogistics: ok, 1 active contracts, 4 transactions.
+
+Tests cover the full workflow: `ShipmentProposal → Accept → Shipment → CreateInvoice → Invoice → MarkPaid`. The `assertMsg` guard against double-payment is exercised by the test scenario.
+
+> Note: On Windows CMD, the Turkish locale can cause a `DAML-LF Name "SCRİPT"` parsing error. Run tests in WSL/Ubuntu or set `JAVA_TOOL_OPTIONS=-Duser.language=en` first.
+
+---
+
 ## Running Locally
 
 ### Prerequisites
@@ -124,8 +141,14 @@ Open http://localhost:5173 — you should see "🟢 Connected to Canton ledger v
 
 ## Demo
 
-Full walkthrough (46 seconds): [https://youtu.be/HT-yrPHfErk](https://youtu.be/HT-yrPHfErk)
+**Live demo:** _[deployed URL coming soon]_
 
+**Walkthrough video** (46 seconds): [https://youtu.be/HT-yrPHfErk](https://youtu.be/HT-yrPHfErk)
+
+What you'll see in the live demo:
+- A role selector that pulls real party IDs from `/v2/parties`
+- Each role only sees actions it is authorized to perform on the ledger
+- Every click triggers a real Canton transaction with toast feedback
 ---
 
 ## Project Status
@@ -135,7 +158,11 @@ Full walkthrough (46 seconds): [https://youtu.be/HT-yrPHfErk](https://youtu.be/H
 - [x] JSON API integration verified via `curl`
 - [x] React frontend connected to live ledger
 - [x] End-to-end workflow working (browser → API → ledger)
+- [x] Dynamic role selector (party IDs fetched from ledger)
+- [x] Toast notifications for every ledger action
+- [x] Role-aware UI (each party only sees authorized actions)
 - [x] Submission demo video
+- [ ] Live web deployment (Vercel)
 - [ ] Production deployment (Canton devnet)
 - [ ] Pilot with real freight forwarder
 
@@ -162,6 +189,26 @@ Full walkthrough (46 seconds): [https://youtu.be/HT-yrPHfErk](https://youtu.be/H
 - Additional workflows: proof-of-delivery, customs paperwork, dispute resolution
 
 ---
+
+## Security & Trust Model
+
+ChainFreight inherits Canton's multi-party authorization model end-to-end:
+
+- **Signatories.** Every contract requires both Shipper and Carrier as signatories on `Shipment` and `Invoice`. Neither party can unilaterally create, modify, or settle a contract — both must authorize.
+- **Selective disclosure.** A `ShipmentProposal` is signed by the Shipper and only observed by the named Carrier. Other parties on the ledger cannot see it.
+- **Choice controllers.** Each state transition is gated by a specific party: only the Carrier can `Accept` a proposal, only the Shipper can `MarkPaid` an invoice.
+- **Double-payment guard.** The `MarkPaid` choice carries an `assertMsg "Invoice is already paid" (not isPaid)` check enforced ledger-side. Replay attempts fail at the ledger, not the UI.
+- **Tamper-proof history.** Every action — create, accept, invoice, pay — is an immutable Canton transaction. There is no "edit" path.
+
+The frontend never holds private keys; all submissions go through the participant node via the JSON Ledger API, with `actAs` tying the request to a Canton party.
+
+## Known Limitations
+
+We list these explicitly because they matter for any production conversation:
+
+- **Polling, not streaming.** The UI refreshes via `/v2/state/active-contracts` every 3 seconds. For production, Canton's gRPC streaming or PQS-backed subscriptions would replace polling.
+- **`details: Text` payload.** Shipment details are intentionally a free-text field for the hackathon. A production schema would split origin, destination, INCO terms, weight, and cargo type into typed fields.
+- **Single sandbox, single domain.** No devnet deployment yet. The same Daml package is deploy-ready for Canton devnet; the work is operational, not architectural.
 
 ## License
 
