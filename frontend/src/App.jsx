@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-
+import toast, { Toaster } from 'react-hot-toast'
 // ═══════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════
@@ -223,10 +223,11 @@ function App() {
 
   async function createProposal(details, price) {
     if (!counterparty) {
-      setError('Carrier not found on ledger')
+      toast.error('Carrier not found on ledger')
       return
     }
     setLoading(true)
+    const t = toast.loading('Creating proposal on ledger…')
     try {
       await submitCommand(session.partyId, [{
         CreateCommand: {
@@ -240,7 +241,9 @@ function App() {
         }
       }])
       await refresh()
+      toast.success('Proposal created on ledger', { id: t })
     } catch (e) {
+      toast.error(`Create failed: ${e.message}`, { id: t })
       setError(`Create failed: ${e.message}`)
     } finally {
       setLoading(false)
@@ -249,6 +252,7 @@ function App() {
 
   async function acceptProposal(contractId) {
     setLoading(true)
+    const t = toast.loading('Accepting proposal…')
     try {
       await submitCommand(session.partyId, [{
         ExerciseCommand: {
@@ -259,15 +263,18 @@ function App() {
         }
       }])
       await refresh()
+      toast.success('Shipment accepted — contract created', { id: t })
     } catch (e) {
+      toast.error(`Accept failed: ${e.message}`, { id: t })
       setError(`Accept failed: ${e.message}`)
     } finally {
       setLoading(false)
     }
   }
 
-  async function createInvoice(contractId) {
+async function createInvoice(contractId) {
     setLoading(true)
+    const t = toast.loading('Creating invoice on ledger…')
     try {
       await submitCommand(session.partyId, [{
         ExerciseCommand: {
@@ -278,15 +285,18 @@ function App() {
         }
       }])
       await refresh()
+      toast.success('Invoice created', { id: t })
     } catch (e) {
+      toast.error(`Create invoice failed: ${e.message}`, { id: t })
       setError(`Create invoice failed: ${e.message}`)
     } finally {
       setLoading(false)
     }
   }
 
-  async function markPaid(contractId) {
+async function markPaid(contractId) {
     setLoading(true)
+    const t = toast.loading('Marking invoice as paid…')
     try {
       await submitCommand(session.partyId, [{
         ExerciseCommand: {
@@ -297,18 +307,21 @@ function App() {
         }
       }])
       await refresh()
+      toast.success('Invoice marked as paid ✓', { id: t })
     } catch (e) {
+      toast.error(`Mark paid failed: ${e.message}`, { id: t })
       setError(`Mark paid failed: ${e.message}`)
     } finally {
       setLoading(false)
     }
   }
 
-  function logout() {
+function logout() {
     setSession(null)
     setContracts([])
     setCounterparty(null)
     setError(null)
+    toast.success('Switched out — choose a new role')
   }
 
   // ─── RENDER ───────────────────────────────────────────────
@@ -331,6 +344,24 @@ function App() {
 
   return (
     <div className="app">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#1e293b',
+            color: '#e2e8f0',
+            border: '1px solid rgba(148, 163, 184, 0.2)',
+          },
+          success: {
+            iconTheme: { primary: '#10b981', secondary: '#1e293b' },
+          },
+          error: {
+            iconTheme: { primary: '#ef4444', secondary: '#1e293b' },
+            duration: 5000,
+          },
+        }}
+      />
       <header>
         <div className="header-row">
           <div>
