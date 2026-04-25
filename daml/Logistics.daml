@@ -2,15 +2,28 @@ module Logistics where
 
 import Daml.Script
 
+-- ═══════════════════════════════════════════════════════════
+-- SHIPMENT PROPOSAL
+-- ═══════════════════════════════════════════════════════════
+-- Shipper proposes a shipment with structured details.
+-- Carrier may Accept (creates Shipment) or Reject (auto-archives).
+-- ═══════════════════════════════════════════════════════════
+
 template ShipmentProposal
   with
     shipper : Party
     carrier : Party
-    details : Text
+    origin : Text
+    destination : Text
+    cargoType : Text
+    weightKg : Decimal
     price : Decimal
+    details : Text
   where
     signatory shipper
     observer carrier
+
+    ensure price > 0.0 && weightKg > 0.0
 
     choice Accept : ContractId Shipment
       controller carrier
@@ -18,20 +31,33 @@ template ShipmentProposal
         create Shipment with
           shipper = shipper
           carrier = carrier
-          details = details
+          origin = origin
+          destination = destination
+          cargoType = cargoType
+          weightKg = weightKg
           price = price
+          details = details
 
     choice Reject : ()
       controller carrier
       do
-        pure ()
+        return ()
+
+
+-- ═══════════════════════════════════════════════════════════
+-- SHIPMENT
+-- ═══════════════════════════════════════════════════════════
 
 template Shipment
   with
     shipper : Party
     carrier : Party
-    details : Text
+    origin : Text
+    destination : Text
+    cargoType : Text
+    weightKg : Decimal
     price : Decimal
+    details : Text
   where
     signatory shipper, carrier
 
@@ -41,19 +67,34 @@ template Shipment
         create Invoice with
           shipper = shipper
           carrier = carrier
+          origin = origin
+          destination = destination
+          cargoType = cargoType
+          weightKg = weightKg
           amount = price
           details = details
           isPaid = False
+
+
+-- ═══════════════════════════════════════════════════════════
+-- INVOICE
+-- ═══════════════════════════════════════════════════════════
 
 template Invoice
   with
     shipper : Party
     carrier : Party
+    origin : Text
+    destination : Text
+    cargoType : Text
+    weightKg : Decimal
     amount : Decimal
     details : Text
     isPaid : Bool
   where
     signatory carrier, shipper
+
+    ensure amount > 0.0
 
     choice MarkPaid : ContractId Invoice
       controller shipper
@@ -62,29 +103,52 @@ template Invoice
         create this with isPaid = True
 
 
--- TEST SENARYOSU
+-- ═══════════════════════════════════════════════════════════
+-- TEST SCENARIOS
+-- ═══════════════════════════════════════════════════════════
+
 testLogistics = script do
   shipper <- allocateParty "Shipper"
   carrier <- allocateParty "Carrier"
 
-  -- 1. Shipper bir sevkiyat önerisi oluşturur
   proposalId <- submit shipper do
     createCmd ShipmentProposal with
       shipper = shipper
       carrier = carrier
-      details = "20ft Container - Electronics from Istanbul to Ankara"
+      origin = "Istanbul"
+      destination = "Ankara"
+      cargoType = "Electronics"
+      weightKg = 800.0
       price = 5000.0
+      details = "20ft Container - urgent"
 
-  -- 2. Carrier öneriyi kabul eder, Shipment oluşur
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept
 
-  -- 3. Carrier teslimat sonrası fatura keser
   invoiceId <- submit carrier do
     exerciseCmd shipmentId CreateInvoice
 
-  -- 4. Shipper faturayı öder
   submit shipper do
     exerciseCmd invoiceId MarkPaid
+
+  pure ()
+
+testReject = script do
+  shipper <- allocateParty "Shipper2"
+  carrier <- allocateParty "Carrier2"
+
+  proposalId <- submit shipper do
+    createCmd ShipmentProposal with
+      shipper = shipper
+      carrier = carrier
+      origin = "Izmir"
+      destination = "Ankara"
+      cargoType = "Hazardous"
+      weightKg = 1200.0
+      price = 8000.0
+      details = "Reject scenario test"
+
+  submit carrier do
+    exerciseCmd proposalId Reject
 
   pure ()

@@ -675,4 +675,123 @@ header h1 {
 }
 .activity-row.activity-proposed {
   border-left: 3px solid #3b82f6;
+}/* ═══════════════════════════════════════════════════════════
+   FORM GRID (multi-input shipper form)
+   ═══════════════════════════════════════════════════════════ */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 720px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-grid input {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #e2e8f0;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.form-grid input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.form-grid input::placeholder {
+  color: #64748b;
+}
+
+.form-grid input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-submit {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.form-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.form-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   META PILLS (cargo type, weight tags)
+   ═══════════════════════════════════════════════════════════ */
+
+.card-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0 12px;
+}
+
+.meta-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #93c5fd;
+  letter-spacing: 0.3px;
+}
+
+.card-notes {
+  font-style: italic;
+  color: #94a3b8;
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD ACTIONS (Accept + Reject side by side)
+   ═══════════════════════════════════════════════════════════ */
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.card-actions button {
+  flex: 1;
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5 !important;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25) !important;
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  color: #ef4444 !important;
 }

@@ -75,7 +75,7 @@ function App() {
 
   // ─── ACTIONS ──────────────────────────────────────────────
 
-  async function createProposal(details, price) {
+  async function createProposal(input) {
     if (!counterparty) {
       toast.error('Carrier not found on ledger')
       return
@@ -89,8 +89,12 @@ function App() {
           createArguments: {
             shipper: session.partyId,
             carrier: counterparty,
-            details,
-            price: price.toString()
+            origin: input.origin,
+            destination: input.destination,
+            cargoType: input.cargoType,
+            weightKg: input.weightKg.toString(),
+            price: input.price.toString(),
+            details: input.details
           }
         }
       }])
@@ -99,6 +103,28 @@ function App() {
     } catch (e) {
       toast.error(`Create failed: ${e.message}`, { id: t })
       setError(`Create failed: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function rejectProposal(contractId) {
+    setLoading(true)
+    const t = toast.loading('Rejecting proposal…')
+    try {
+      await submitCommand(session.partyId, [{
+        ExerciseCommand: {
+          templateId: '#chainfreight:Logistics:ShipmentProposal',
+          contractId,
+          choice: 'Reject',
+          choiceArgument: {}
+        }
+      }])
+      await refresh()
+      toast.success('Proposal rejected', { id: t })
+    } catch (e) {
+      toast.error(`Reject failed: ${e.message}`, { id: t })
+      setError(`Reject failed: ${e.message}`)
     } finally {
       setLoading(false)
     }
@@ -271,6 +297,7 @@ function App() {
             proposals={proposals}
             shipments={shipments}
             onAccept={acceptProposal}
+            onReject={rejectProposal}
             onCreateInvoice={createInvoice}
             loading={loading}
           />
