@@ -4,6 +4,18 @@
 
 > HackCanton League Season #1 — RWA & Business Workflows Track
 
+## Why a ledger, not a database?
+
+Two parties — a shipper and a carrier — need to agree on what was shipped, what was invoiced, what was paid, and what's in dispute. Today they reconcile this across WhatsApp, Excel, and email, and lose 3–5 hours a week on it. A traditional database doesn't solve that, because *whose* database is it? Whoever owns the database can edit the record.
+
+ChainFreight runs the workflow as Daml smart contracts on Canton, where:
+
+- **Both parties co-sign every transition.** A shipper cannot mark their own invoice paid for the carrier; a carrier cannot unilaterally settle a dispute.
+- **Selective disclosure is enforced by the ledger.** Each role only sees the contracts they're authorized to see — not by hiding things in the UI, but by signatory and observer rules in the Daml code.
+- **The state machine cannot be bypassed.** `assertMsg` checks (no double-pay, no dispute on a paid invoice, no claim above the invoice amount) live on the ledger, so the UI is just a thin client over a tamper-proof workflow.
+
+This is what a ledger gives you that a database cannot.
+
 [![Daml Tests](https://img.shields.io/badge/daml%20tests-4%20passing-success?style=flat-square)]()
 [![Choice Coverage](https://img.shields.io/badge/choice%20coverage-63%25-yellow?style=flat-square)]()
 [![Templates](https://img.shields.io/badge/templates-4-blue?style=flat-square)]()
@@ -111,7 +123,45 @@ The carrier accepts the claim (reduced invoice issued) or rejects it (original a
 
 ![Resolve dispute](docs/screenshots/06-resolve-dispute.png.jpeg)
 
+## Quick Start
+
+You'll need [Daml SDK 3.4.11](https://docs.daml.com/getting-started/installation.html), Java 17, and Node.js 20+.
+
+```bash
+# 1. Clone and enter the repo
+git clone https://github.com/CMZS4/canton-logistics-invoice.git
+cd canton-logistics-invoice
+
+# 2. Start the Canton sandbox + JSON Ledger API (keep this running)
+daml start
+
+# 3. In a second terminal, allocate the two parties
+curl -X POST http://localhost:7575/v2/parties \
+  -H "Content-Type: application/json" \
+  -d '{"partyIdHint":"Shipper","displayName":"Murat Logistics"}'
+
+curl -X POST http://localhost:7575/v2/parties \
+  -H "Content-Type: application/json" \
+  -d '{"partyIdHint":"Carrier","displayName":"FastFreight"}'
+
+# 4. In a third terminal, start the React frontend
+cd frontend
+npm install
+npm run dev
+
+# 5. Open http://localhost:5173 — pick a role and go
+```
+
+To run the Daml test suite:
+
+```bash
+daml test
+```
+
+You should see all five scenarios pass: `testLogistics`, `testReject`, `testDisputeAccepted`, `testDisputeRejected`, `testEdgeCases`.
+
 ## Smart Contracts
+         
 
 Four Daml templates, all live on ledger.
 
@@ -146,7 +196,21 @@ The Dispute template is the difference between a happy-path demo and a real B2B 
 - `DisputeStatus` is a Daml ADT, not a free-form string. Typos are rejected at compile time.
 - `claimedAmount <= amount` is enforced inside `RaiseDispute`, not in the UI.
 - All `assertMsg` checks (double-pay, dispute on already-paid invoice, status-already-resolved) run on the ledger — the UI cannot bypass them.
----
+
+### A note on contract lifecycle
+
+A common question: "do these contracts get archived after they're resolved?"
+
+Yes — automatically. In Daml, choices are **consuming by default**, which means the contract on which a choice is exercised is archived as part of the same transaction. So:
+
+- `Accept` archives the `ShipmentProposal` and creates a `Shipment`.
+- `Reject` archives the `ShipmentProposal` with no replacement.
+- `CreateInvoice` archives the `Shipment` and creates an `Invoice`.
+- `MarkPaid` archives the unpaid `Invoice` and creates a paid one.
+- `RaiseDispute` archives the `Invoice` and creates a `Dispute`.
+- `AcceptClaim` / `RejectClaim` archives the `Dispute` and creates a fresh `Invoice` (reduced or original).
+
+You can verify this from `daml test` output: `testReject` ends with `0 active contracts, 2 transactions` — the proposal was created and archived, leaving nothing behind. Adding an explicit `archive self` would actually be a bug; Daml would reject it as a double-archive in the same transaction.
 
 ## Running Tests
 

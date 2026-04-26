@@ -80,6 +80,18 @@ export default function RoleSelector({ onSelect }) {
         <div className="ledger-status" style={{ marginTop: '24px' }}>
           🟢 Connected to Canton ledger via JSON API
         </div>
+
+        <div className="why-canton">
+          <h3>Why a ledger, not a database?</h3>
+          <p>
+            Each role you sign in as has different permissions enforced
+            by the ledger itself, not by the UI. A shipper cannot mark
+            their own invoice paid for the carrier. A carrier cannot
+            unilaterally settle a dispute. Every transition is a signed
+            transaction with both parties' authorization, recorded
+            tamper-proof on Canton.
+          </p>
+        </div>
       </div>
     </div>
   )

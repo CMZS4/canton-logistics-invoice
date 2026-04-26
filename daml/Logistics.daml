@@ -127,6 +127,7 @@ template Invoice
           origin = origin
           destination = destination
           cargoType = cargoType
+          weightKg = weightKg
           originalAmount = amount
           claimedAmount = claimedAmount
           reason = reason
@@ -144,6 +145,7 @@ template Dispute
     origin : Text
     destination : Text
     cargoType : Text
+    weightKg : Decimal
     originalAmount : Decimal
     claimedAmount : Decimal
     reason : Text
@@ -165,7 +167,7 @@ template Dispute
           origin = origin
           destination = destination
           cargoType = cargoType
-          weightKg = 0.0
+          weightKg = weightKg
           amount = claimedAmount
           details = "Settlement after dispute: " <> reason
           isPaid = False
@@ -181,7 +183,7 @@ template Dispute
           origin = origin
           destination = destination
           cargoType = cargoType
-          weightKg = 0.0
+          weightKg = weightKg
           amount = originalAmount
           details = "Dispute rejected; original amount stands. Reason of dispute: " <> reason
           isPaid = False
@@ -307,5 +309,52 @@ testDisputeRejected = script do
   -- Shipper has to pay the original amount
   submit shipper do
     exerciseCmd reissuedInvoiceId MarkPaid
+
+testEdgeCases = script do
+  shipper <- allocateParty "Shipper5"
+  carrier <- allocateParty "Carrier5"
+
+  -- Setup: create a normal invoice
+  proposalId <- submit shipper do
+    createCmd ShipmentProposal with
+      shipper = shipper
+      carrier = carrier
+      origin = "Mersin"
+      destination = "Konya"
+      cargoType = "Edge case test"
+      weightKg = 200.0
+      price = 1500.0
+      details = "Edge case scenarios"
+
+  shipmentId <- submit carrier do
+    exerciseCmd proposalId Accept
+
+  invoiceId <- submit carrier do
+    exerciseCmd shipmentId CreateInvoice
+
+  -- Edge case 1: Cannot claim more than the invoice amount
+  submitMustFail shipper do
+    exerciseCmd invoiceId RaiseDispute with
+      reason = "Trying to over-claim"
+      claimedAmount = 9999.0
+
+  -- Edge case 2: Cannot claim a negative or zero amount
+  submitMustFail shipper do
+    exerciseCmd invoiceId RaiseDispute with
+      reason = "Trying to claim zero"
+      claimedAmount = 0.0
+
+  -- Edge case 3: Pay the invoice, then try to dispute it
+  paidInvoiceId <- submit shipper do
+    exerciseCmd invoiceId MarkPaid
+
+  submitMustFail shipper do
+    exerciseCmd paidInvoiceId RaiseDispute with
+      reason = "Trying to dispute a paid invoice"
+      claimedAmount = 500.0
+
+  -- Edge case 4: Cannot pay an already-paid invoice
+  submitMustFail shipper do
+    exerciseCmd paidInvoiceId MarkPaid
 
   pure ()

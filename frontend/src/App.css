@@ -973,4 +973,31 @@ header h1 {
 /* Activity row for disputes */
 .activity-row.activity-dispute {
   border-left: 3px solid #f59e0b;
+}/* ═══════════════════════════════════════════════════════════
+   "WHY CANTON" BANNER ON LOGIN SCREEN
+   ═══════════════════════════════════════════════════════════ */
+
+.why-canton {
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+  max-width: 540px;
+}
+
+.why-canton h3 {
+  margin: 0 0 8px;
+  color: #a78bfa;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.why-canton p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.6;
 }
