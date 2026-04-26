@@ -4,6 +4,12 @@
 
 > HackCanton League Season #1 — RWA & Business Workflows Track
 
+[![Daml Tests](https://img.shields.io/badge/daml%20tests-4%20passing-success?style=flat-square)]()
+[![Choice Coverage](https://img.shields.io/badge/choice%20coverage-63%25-yellow?style=flat-square)]()
+[![Templates](https://img.shields.io/badge/templates-4-blue?style=flat-square)]()
+[![Canton](https://img.shields.io/badge/canton-3.4.11-purple?style=flat-square)]()
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)]()
+
 ---
 
 ## The Problem
@@ -72,6 +78,38 @@ Every transition is a real Canton transaction signed by the required parties. Th
 - **Docker + Ubuntu WSL2** — dev environment
 
 ---
+
+## Screenshots
+
+### Sign in as Shipper or Carrier
+Each role gets a separate session, with its own party ID issued by the Canton ledger.
+
+![Login](docs/screenshots/01-login.png.jpeg)
+
+### Real-time analytics from the ledger
+KPI cards, workflow stage donut, settlement velocity, and an activity feed — all derived from active contracts.
+
+![Dashboard](docs/screenshots/02-dashboard.png.jpeg)
+
+### Carrier reviews incoming proposals — Accept or Reject
+Both choices are live on the ledger: Accept creates a Shipment, Reject archives the proposal.
+
+![Carrier proposal](docs/screenshots/03-carrier-proposal.png.jpeg)
+
+### Carrier issues an invoice
+Once a shipment is in transit, the carrier can issue an invoice — both shipper and carrier co-sign it on the ledger.
+
+![Carrier active](docs/screenshots/04-carrier-active.png.jpeg)
+
+### Shipper raises a dispute
+If something went wrong, the shipper raises a dispute with a reason and a claimed amount — capped at the original invoice on-ledger.
+
+![Raise dispute](docs/05-raise-dispute.png.jpeg)
+
+### Carrier resolves the dispute
+The carrier accepts the claim (reduced invoice issued) or rejects it (original amount stands). Either path is enforced as a Daml choice.
+
+![Resolve dispute](docs/screenshots/06-resolve-dispute.png.jpeg)
 
 ## Smart Contracts
 
