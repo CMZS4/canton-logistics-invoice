@@ -21,15 +21,28 @@ ChainFreight puts the shipment-to-invoice workflow on **Canton Network** as tamp
 ---
 
 ## The Workflow
+
+The happy path:
 Shipper creates proposal
 ↓
-Carrier accepts → Shipment contract
+Carrier accepts → Shipment contract (or rejects, archived)
 ↓
-Carrier invoices → Invoice contract
+Carrier issues Invoice
 ↓
 Shipper marks paid → isPaid: true
 
-All four steps are real Canton transactions, each signed by the required parties.
+The dispute path (when something goes wrong):
+…Invoice exists
+↓
+Shipper raises Dispute (reason + claimed amount)
+↓
+Carrier resolves:
+├─ AcceptClaim → reduced Invoice
+└─ RejectClaim → original Invoice reissued
+↓
+Shipper pays the resolved Invoice
+
+Every transition is a real Canton transaction signed by the required parties. The on-ledger state machine — not the UI — decides what is allowed.
 
 ---
 
@@ -62,12 +75,13 @@ All four steps are real Canton transactions, each signed by the required parties
 
 ## Smart Contracts
 
-Three Daml templates, all live on ledger:
+Four Daml templates, all live on ledger.
 
 ### ShipmentProposal
 - **Signatory:** Shipper
 - **Observer:** Carrier
-- **Choices:** `Accept`, `Reject`
+- **Choices:** `Accept` (creates Shipment), `Reject` (auto-archives)
+- **Validation:** `ensure price > 0.0 && weightKg > 0.0`
 
 ### Shipment
 - **Signatories:** Shipper + Carrier (both required)
@@ -75,9 +89,25 @@ Three Daml templates, all live on ledger:
 
 ### Invoice
 - **Signatories:** Shipper + Carrier
-- **Choice:** `MarkPaid` (controller: Shipper)
-- Double-pay guarded via `assertMsg`
+- **Choices:**
+  - `MarkPaid` (controller: Shipper) — guarded against double-pay
+  - `RaiseDispute` (controller: Shipper) — see Dispute below
+- **Validation:** `ensure amount > 0.0`
 
+### Dispute
+- **Signatories:** Shipper + Carrier
+- **Status:** typed enum (`Open` | `Resolved`)
+- **Choices:**
+  - `AcceptClaim` (controller: Carrier) — issues a new Invoice with the claimed amount
+  - `RejectClaim` (controller: Carrier) — reissues the original Invoice
+
+The Dispute template is the difference between a happy-path demo and a real B2B workflow. Forwarders don't lose 3-5 hours a week on shipments that go right — they lose them on shipments that go wrong, and on having no shared, tamper-proof record of what was agreed.
+
+### Type-safety details
+
+- `DisputeStatus` is a Daml ADT, not a free-form string. Typos are rejected at compile time.
+- `claimedAmount <= amount` is enforced inside `RaiseDispute`, not in the UI.
+- All `assertMsg` checks (double-pay, dispute on already-paid invoice, status-already-resolved) run on the ledger — the UI cannot bypass them.
 ---
 
 ## Running Tests
@@ -153,7 +183,7 @@ What you'll see in the live demo:
 
 ## Project Status
 
-- [x] Daml smart contracts (3 templates, test suite passing)
+- [x] Daml smart contracts — 4 templates, 4 test scenarios, 63% choice coverage
 - [x] Canton sandbox running locally
 - [x] JSON API integration verified via `curl`
 - [x] React frontend connected to live ledger
@@ -161,7 +191,12 @@ What you'll see in the live demo:
 - [x] Dynamic role selector (party IDs fetched from ledger)
 - [x] Toast notifications for every ledger action
 - [x] Role-aware UI (each party only sees authorized actions)
-- [x] Submission demo video
+- [x] Reject flow (proposal archived on reject)
+- [x] Dispute workflow (raise → accept/reject → settlement)
+- [x] Real-time analytics dashboard (KPIs, donut chart, activity feed)
+- [x] Structured shipment data (origin, destination, cargoType, weightKg)
+- [x] Type-safe dispute status (Daml ADT, not string)
+- [x] Submission demo video (older version — to be re-recorded)
 - [ ] Live web deployment (Vercel)
 - [ ] Production deployment (Canton devnet)
 - [ ] Pilot with real freight forwarder
@@ -179,14 +214,17 @@ What you'll see in the live demo:
 ## What's Real, What's Next
 
 **Live today:**
-- Three Daml contract templates on Canton sandbox
-- Full workflow executed end-to-end from the React UI
+- Four Daml contract templates on Canton sandbox
+- Happy path: propose → accept → invoice → pay
+- Dispute path: raise → accept claim (reduced invoice) | reject claim (original reissued) → pay
 - Multi-party signatures + selective disclosure enforced by the ledger
+- Real-time analytics dashboard derived from active contracts
 
 **Next:**
 - Deploy to Canton devnet (live network)
 - Pilot with one real freight forwarder for production validation
-- Additional workflows: proof-of-delivery, customs paperwork, dispute resolution
+- Additional workflows: proof-of-delivery, customs paperwork, document attachment
+- Optional auditor party for selective disclosure of disputes to a neutral third party
 
 ---
 
