@@ -794,4 +794,183 @@ header h1 {
   background: rgba(239, 68, 68, 0.25) !important;
   border-color: rgba(239, 68, 68, 0.6) !important;
   color: #ef4444 !important;
+}/* ═══════════════════════════════════════════════════════════
+   DISPUTE STYLES
+   ═══════════════════════════════════════════════════════════ */
+
+/* Dispute card distinctive look */
+.card.dispute {
+  border-left: 3px solid #f59e0b;
+}
+
+.dispute-badge {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+}
+
+/* Amount comparison block */
+.dispute-amounts {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 12px 0;
+}
+
+.dispute-amount-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.amount-label {
+  color: #94a3b8;
+}
+
+.amount-strikethrough {
+  color: #64748b;
+  text-decoration: line-through;
+  font-family: monospace;
+}
+
+.amount-claim {
+  color: #10b981;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.amount-reduction {
+  color: #f87171;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.reduction-row {
+  border-top: 1px dashed rgba(148, 163, 184, 0.2);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.dispute-reason {
+  font-style: italic;
+  color: #cbd5e1;
+  background: rgba(245, 158, 11, 0.05);
+  border-left: 2px solid rgba(245, 158, 11, 0.4);
+  padding: 8px 12px;
+  margin: 12px 0;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INLINE DISPUTE FORM (inside InvoicePanel)
+   ═══════════════════════════════════════════════════════════ */
+
+.dispute-form {
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.dispute-form h4 {
+  margin: 0 0 12px;
+  color: #fbbf24;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dispute-form input {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #e2e8f0;
+  font-size: 13px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.dispute-form input:focus {
+  outline: none;
+  border-color: #f59e0b;
+}
+
+.dispute-form input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dispute-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 8px 0 12px;
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BUTTON VARIANTS
+   ═══════════════════════════════════════════════════════════ */
+
+.btn-warning {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  color: #fbbf24 !important;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.25) !important;
+  border-color: rgba(245, 158, 11, 0.6) !important;
+}
+
+.btn-secondary {
+  background: rgba(100, 116, 139, 0.15) !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  color: #cbd5e1 !important;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(100, 116, 139, 0.25) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TAB COUNT BADGE (e.g. "Disputes 2")
+   ═══════════════════════════════════════════════════════════ */
+
+.tab-count {
+  display: inline-block;
+  margin-left: 6px;
+  background: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}/* Disputed velocity segment */
+.velocity-segment.disputed {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+/* Alerted KPI card */
+.kpi-card.kpi-alert {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.kpi-card.kpi-alert .kpi-value {
+  background: linear-gradient(135deg, #ef4444, #f87171);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Activity row for disputes */
+.activity-row.activity-dispute {
+  border-left: 3px solid #f59e0b;
 }

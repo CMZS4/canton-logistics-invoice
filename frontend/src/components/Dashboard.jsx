@@ -11,14 +11,12 @@ import {
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════
 // Aggregated metrics derived from active ledger contracts.
-// Everything here is a function of the same contracts list
-// used by the role panels — no separate data source.
+// Now includes the dispute lifecycle.
 // ═══════════════════════════════════════════════════════════
 
 export default function Dashboard({ contracts }) {
   const [now, setNow] = useState(new Date())
 
-  // Update "live" timestamp every second
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(id)
@@ -27,6 +25,7 @@ export default function Dashboard({ contracts }) {
   const proposals = contracts.filter(c => c.template === 'ShipmentProposal')
   const shipments = contracts.filter(c => c.template === 'Shipment')
   const invoices = contracts.filter(c => c.template === 'Invoice')
+  const disputes = contracts.filter(c => c.template === 'Dispute')
 
   const paidInvoices = invoices.filter(inv =>
     inv.fields.isPaid === true || inv.fields.isPaid === 'true'
@@ -35,7 +34,9 @@ export default function Dashboard({ contracts }) {
     !(inv.fields.isPaid === true || inv.fields.isPaid === 'true')
   )
 
-  const totalShipments = proposals.length + shipments.length + invoices.length
+  const totalContracts =
+    proposals.length + shipments.length + invoices.length + disputes.length
+
   const settlementRate = invoices.length > 0
     ? Math.round((paidInvoices.length / invoices.length) * 100)
     : 0
@@ -50,47 +51,61 @@ export default function Dashboard({ contracts }) {
     0
   )
 
+  const totalDisputedVolume = disputes.reduce((sum, d) => {
+    const orig = parseFloat(d.fields.originalAmount || 0)
+    const claim = parseFloat(d.fields.claimedAmount || 0)
+    return sum + (orig - claim)
+  }, 0)
+
   // Pie chart data — workflow stage distribution
   const stageData = [
     { name: 'Proposed', value: proposals.length, color: '#3b82f6' },
     { name: 'In Transit', value: shipments.length, color: '#8b5cf6' },
     { name: 'Pending Pay', value: pendingInvoices.length, color: '#f59e0b' },
+    { name: 'Disputed', value: disputes.length, color: '#ef4444' },
     { name: 'Settled', value: paidInvoices.length, color: '#10b981' }
   ].filter(d => d.value > 0)
 
   // For the velocity bar
   const settled = paidInvoices.length
-  const pending = pendingInvoices.length + proposals.length + shipments.length
-  const total = settled + pending
+  const inFlight = pendingInvoices.length + proposals.length + shipments.length
+  const inDispute = disputes.length
+  const total = settled + inFlight + inDispute
   const settledPct = total > 0 ? (settled / total) * 100 : 0
-  const pendingPct = total > 0 ? (pending / total) * 100 : 0
+  const inFlightPct = total > 0 ? (inFlight / total) * 100 : 0
+  const disputePct = total > 0 ? (inDispute / total) * 100 : 0
 
-  // Build a unified, ordered activity feed (newest contracts first by default
-  // since the ledger returns active contracts and we keep insertion order)
+  // Activity feed
   const activity = [
+    ...disputes.map(d => ({
+      key: d.contractId,
+      icon: '⚠️',
+      type: 'dispute',
+      text: `Dispute open: "${d.fields.reason}" — ${d.fields.origin} → ${d.fields.destination} (claim $${parseFloat(d.fields.claimedAmount).toLocaleString('en-US')} of $${parseFloat(d.fields.originalAmount).toLocaleString('en-US')})`
+    })),
     ...paidInvoices.map(inv => ({
       key: inv.contractId,
       icon: '✅',
       type: 'settled',
-      text: `Settled $${parseFloat(inv.fields.amount).toLocaleString('en-US')} — ${inv.fields.details}`
+      text: `Settled $${parseFloat(inv.fields.amount).toLocaleString('en-US')} — ${inv.fields.origin} → ${inv.fields.destination}`
     })),
     ...pendingInvoices.map(inv => ({
       key: inv.contractId,
       icon: '⏳',
       type: 'pending',
-      text: `Awaiting payment $${parseFloat(inv.fields.amount).toLocaleString('en-US')} — ${inv.fields.details}`
+      text: `Awaiting payment $${parseFloat(inv.fields.amount).toLocaleString('en-US')} — ${inv.fields.origin} → ${inv.fields.destination}`
     })),
     ...shipments.map(s => ({
       key: s.contractId,
       icon: '🚚',
       type: 'transit',
-      text: `In transit — ${s.fields.details} ($${parseFloat(s.fields.price).toLocaleString('en-US')})`
+      text: `In transit — ${s.fields.origin} → ${s.fields.destination} ($${parseFloat(s.fields.price).toLocaleString('en-US')})`
     })),
     ...proposals.map(p => ({
       key: p.contractId,
       icon: '📝',
       type: 'proposed',
-      text: `Proposed — ${p.fields.details} ($${parseFloat(p.fields.price).toLocaleString('en-US')})`
+      text: `Proposed — ${p.fields.origin} → ${p.fields.destination} ($${parseFloat(p.fields.price).toLocaleString('en-US')})`
     }))
   ].slice(0, 8)
 
@@ -110,7 +125,7 @@ export default function Dashboard({ contracts }) {
       {/* KPI cards */}
       <div className="kpi-grid">
         <div className="kpi-card">
-          <div className="kpi-value">{totalShipments}</div>
+          <div className="kpi-value">{totalContracts}</div>
           <div className="kpi-label">Active Contracts</div>
           <div className="kpi-hint">on ledger</div>
         </div>
@@ -124,16 +139,19 @@ export default function Dashboard({ contracts }) {
           <div className="kpi-label">Volume Settled</div>
           <div className="kpi-hint">all-time</div>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-value">{settlementRate}%</div>
-          <div className="kpi-label">Settlement Rate</div>
-          <div className="kpi-hint">paid / total</div>
+        <div className={`kpi-card ${disputes.length > 0 ? 'kpi-alert' : ''}`}>
+          <div className="kpi-value">{disputes.length}</div>
+          <div className="kpi-label">Open Disputes</div>
+          <div className="kpi-hint">
+            {disputes.length > 0
+              ? `$${totalDisputedVolume.toLocaleString('en-US')} contested`
+              : 'no active claims'}
+          </div>
         </div>
       </div>
 
       {/* Two-column: chart + velocity */}
       <div className="dash-row">
-        {/* Pie chart */}
         <div className="dash-cell">
           <h3>Workflow Stages</h3>
           {stageData.length > 0 ? (
@@ -178,7 +196,6 @@ export default function Dashboard({ contracts }) {
           </div>
         </div>
 
-        {/* Velocity */}
         <div className="dash-cell">
           <h3>Settlement Velocity</h3>
           <div className="velocity-bar">
@@ -190,9 +207,15 @@ export default function Dashboard({ contracts }) {
             </div>
             <div
               className="velocity-segment pending"
-              style={{ width: `${pendingPct}%` }}
+              style={{ width: `${inFlightPct}%` }}
             >
-              {pending > 0 && <span>{pending} pending</span>}
+              {inFlight > 0 && <span>{inFlight} in-flight</span>}
+            </div>
+            <div
+              className="velocity-segment disputed"
+              style={{ width: `${disputePct}%` }}
+            >
+              {inDispute > 0 && <span>{inDispute} disputed</span>}
             </div>
           </div>
           {total === 0 && (

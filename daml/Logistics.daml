@@ -3,10 +3,17 @@ module Logistics where
 import Daml.Script
 
 -- ═══════════════════════════════════════════════════════════
--- SHIPMENT PROPOSAL
+-- TYPES
 -- ═══════════════════════════════════════════════════════════
--- Shipper proposes a shipment with structured details.
--- Carrier may Accept (creates Shipment) or Reject (auto-archives).
+
+data DisputeStatus
+  = Open
+  | Resolved
+  deriving (Eq, Show)
+
+
+-- ═══════════════════════════════════════════════════════════
+-- SHIPMENT PROPOSAL
 -- ═══════════════════════════════════════════════════════════
 
 template ShipmentProposal
@@ -79,6 +86,9 @@ template Shipment
 -- ═══════════════════════════════════════════════════════════
 -- INVOICE
 -- ═══════════════════════════════════════════════════════════
+-- Co-signed by both parties. Shipper marks paid OR raises a
+-- Dispute if the delivery had an issue.
+-- ═══════════════════════════════════════════════════════════
 
 template Invoice
   with
@@ -101,6 +111,80 @@ template Invoice
       do
         assertMsg "Invoice is already paid" (not isPaid)
         create this with isPaid = True
+
+    choice RaiseDispute : ContractId Dispute
+      with
+        reason : Text
+        claimedAmount : Decimal
+      controller shipper
+      do
+        assertMsg "Cannot dispute a paid invoice" (not isPaid)
+        assertMsg "Claimed amount must be positive" (claimedAmount > 0.0)
+        assertMsg "Claim cannot exceed invoice amount" (claimedAmount <= amount)
+        create Dispute with
+          shipper = shipper
+          carrier = carrier
+          origin = origin
+          destination = destination
+          cargoType = cargoType
+          originalAmount = amount
+          claimedAmount = claimedAmount
+          reason = reason
+          status = Open
+
+
+-- ═══════════════════════════════════════════════════════════
+-- DISPUTE
+-- ═══════════════════════════════════════════════════════════
+
+template Dispute
+  with
+    shipper : Party
+    carrier : Party
+    origin : Text
+    destination : Text
+    cargoType : Text
+    originalAmount : Decimal
+    claimedAmount : Decimal
+    reason : Text
+    status : DisputeStatus
+  where
+    signatory shipper, carrier
+
+    ensure originalAmount > 0.0 && claimedAmount > 0.0
+
+    -- Carrier accepts the dispute → create a NEW invoice with
+    -- the reduced (claimed) amount. Shipper still has to pay it.
+    choice AcceptClaim : ContractId Invoice
+      controller carrier
+      do
+        assertMsg "Dispute already resolved" (status == Open)
+        create Invoice with
+          shipper = shipper
+          carrier = carrier
+          origin = origin
+          destination = destination
+          cargoType = cargoType
+          weightKg = 0.0
+          amount = claimedAmount
+          details = "Settlement after dispute: " <> reason
+          isPaid = False
+
+    -- Carrier rejects the claim → reissue the original invoice.
+    choice RejectClaim : ContractId Invoice
+      controller carrier
+      do
+        assertMsg "Dispute already resolved" (status == Open)
+        create Invoice with
+          shipper = shipper
+          carrier = carrier
+          origin = origin
+          destination = destination
+          cargoType = cargoType
+          weightKg = 0.0
+          amount = originalAmount
+          details = "Dispute rejected; original amount stands. Reason of dispute: " <> reason
+          isPaid = False
 
 
 -- ═══════════════════════════════════════════════════════════
@@ -150,5 +234,78 @@ testReject = script do
 
   submit carrier do
     exerciseCmd proposalId Reject
+
+  pure ()
+
+testDisputeAccepted = script do
+  shipper <- allocateParty "Shipper3"
+  carrier <- allocateParty "Carrier3"
+
+  proposalId <- submit shipper do
+    createCmd ShipmentProposal with
+      shipper = shipper
+      carrier = carrier
+      origin = "Bursa"
+      destination = "Antalya"
+      cargoType = "Fragile glass"
+      weightKg = 500.0
+      price = 3000.0
+      details = "Glass - dispute scenario"
+
+  shipmentId <- submit carrier do
+    exerciseCmd proposalId Accept
+
+  invoiceId <- submit carrier do
+    exerciseCmd shipmentId CreateInvoice
+
+  -- Shipper raises a dispute claiming partial damage
+  disputeId <- submit shipper do
+    exerciseCmd invoiceId RaiseDispute with
+      reason = "30% of glass items arrived broken"
+      claimedAmount = 2100.0
+
+  -- Carrier accepts the claim → reduced invoice
+  reducedInvoiceId <- submit carrier do
+    exerciseCmd disputeId AcceptClaim
+
+  -- Shipper pays the reduced amount
+  submit shipper do
+    exerciseCmd reducedInvoiceId MarkPaid
+
+  pure ()
+
+testDisputeRejected = script do
+  shipper <- allocateParty "Shipper4"
+  carrier <- allocateParty "Carrier4"
+
+  proposalId <- submit shipper do
+    createCmd ShipmentProposal with
+      shipper = shipper
+      carrier = carrier
+      origin = "Adana"
+      destination = "Izmir"
+      cargoType = "Textiles"
+      weightKg = 300.0
+      price = 2000.0
+      details = "Textile bundle"
+
+  shipmentId <- submit carrier do
+    exerciseCmd proposalId Accept
+
+  invoiceId <- submit carrier do
+    exerciseCmd shipmentId CreateInvoice
+
+  disputeId <- submit shipper do
+    exerciseCmd invoiceId RaiseDispute with
+      reason = "Late delivery"
+      claimedAmount = 500.0
+
+  -- Carrier rejects the claim → original invoice reissued
+  reissuedInvoiceId <- submit carrier do
+    exerciseCmd disputeId RejectClaim
+
+  -- Shipper has to pay the original amount
+  submit shipper do
+    exerciseCmd reissuedInvoiceId MarkPaid
 
   pure ()

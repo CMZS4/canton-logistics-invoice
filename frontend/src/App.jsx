@@ -14,6 +14,7 @@ import ShipperPanel from './components/ShipperPanel'
 import CarrierPanel from './components/CarrierPanel'
 import InvoicePanel from './components/InvoicePanel'
 import Dashboard from './components/Dashboard'
+import DisputePanel from './components/DisputePanel'
 
 const STORAGE_KEY = 'chainfreight_role'
 
@@ -174,6 +175,75 @@ function App() {
     }
   }
 
+  async function raiseDispute(contractId, reason, claimedAmount) {
+    setLoading(true)
+    const t = toast.loading('Raising dispute on ledger…')
+    try {
+      await submitCommand(session.partyId, [{
+        ExerciseCommand: {
+          templateId: '#chainfreight:Logistics:Invoice',
+          contractId,
+          choice: 'RaiseDispute',
+          choiceArgument: {
+            reason,
+            claimedAmount: claimedAmount.toString()
+          }
+        }
+      }])
+      await refresh()
+      toast.success('Dispute raised — awaiting carrier response', { id: t })
+    } catch (e) {
+      toast.error(`Dispute failed: ${e.message}`, { id: t })
+      setError(`Dispute failed: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function acceptClaim(contractId) {
+    setLoading(true)
+    const t = toast.loading('Accepting claim — issuing reduced invoice…')
+    try {
+      await submitCommand(session.partyId, [{
+        ExerciseCommand: {
+          templateId: '#chainfreight:Logistics:Dispute',
+          contractId,
+          choice: 'AcceptClaim',
+          choiceArgument: {}
+        }
+      }])
+      await refresh()
+      toast.success('Claim accepted — reduced invoice issued', { id: t })
+    } catch (e) {
+      toast.error(`Accept claim failed: ${e.message}`, { id: t })
+      setError(`Accept claim failed: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function rejectClaim(contractId) {
+    setLoading(true)
+    const t = toast.loading('Rejecting claim — original invoice reissued…')
+    try {
+      await submitCommand(session.partyId, [{
+        ExerciseCommand: {
+          templateId: '#chainfreight:Logistics:Dispute',
+          contractId,
+          choice: 'RejectClaim',
+          choiceArgument: {}
+        }
+      }])
+      await refresh()
+      toast.success('Claim rejected — original amount stands', { id: t })
+    } catch (e) {
+      toast.error(`Reject claim failed: ${e.message}`, { id: t })
+      setError(`Reject claim failed: ${e.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function markPaid(contractId) {
     setLoading(true)
     const t = toast.loading('Marking invoice as paid…')
@@ -218,6 +288,7 @@ function App() {
   const proposals = contracts.filter(c => c.template === 'ShipmentProposal')
   const shipments = contracts.filter(c => c.template === 'Shipment')
   const invoices = contracts.filter(c => c.template === 'Invoice')
+  const disputes = contracts.filter(c => c.template === 'Dispute')
 
   const isShipper = session.role === 'shipper'
   const roleLabel = isShipper ? '🏢 Shipper — Murat Logistics' : '🚚 Carrier — FastFreight'
@@ -279,6 +350,12 @@ function App() {
         >
           💰 Invoices
         </button>
+        <button
+          className={activeTab === 'dispute' ? 'active' : ''}
+          onClick={() => setActiveTab('dispute')}
+        >
+          ⚠️ Disputes {disputes.length > 0 && <span className="tab-count">{disputes.length}</span>}
+        </button>
       </nav>
 
       <main>
@@ -307,6 +384,16 @@ function App() {
             invoices={invoices}
             isShipper={isShipper}
             onMarkPaid={markPaid}
+            onRaiseDispute={raiseDispute}
+            loading={loading}
+          />
+        )}
+        {activeTab === 'dispute' && (
+          <DisputePanel
+            disputes={disputes}
+            isShipper={isShipper}
+            onAcceptClaim={acceptClaim}
+            onRejectClaim={rejectClaim}
             loading={loading}
           />
         )}

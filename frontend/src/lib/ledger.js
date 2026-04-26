@@ -1,10 +1,6 @@
 // ═══════════════════════════════════════════════════════════
 // CANTON LEDGER API CLIENT
 // ═══════════════════════════════════════════════════════════
-// All HTTP communication with the Canton JSON Ledger API
-// goes through this module. Keeps UI components free of
-// fetch logic.
-// ═══════════════════════════════════════════════════════════
 
 const API_BASE = ''
 
@@ -66,13 +62,27 @@ export async function submitCommand(asParty, commands) {
   return data
 }
 
+// Daml enum values come back as { tag: "Open", value: {} }
+// — flatten them to a plain string for easier UI handling.
+function unwrapEnum(value) {
+  if (value && typeof value === 'object' && 'tag' in value) {
+    return value.tag
+  }
+  return value
+}
+
 export function parseContract(entry) {
   const ev = entry.contractEntry?.JsActiveContract?.createdEvent
   if (!ev) return null
   const templateName = ev.templateId.split(':').pop()
+  const fields = { ...ev.createArgument }
+  // Normalize known enum fields
+  if (fields.status) {
+    fields.status = unwrapEnum(fields.status)
+  }
   return {
     contractId: ev.contractId,
     template: templateName,
-    fields: ev.createArgument
+    fields
   }
 }
