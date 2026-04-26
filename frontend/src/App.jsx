@@ -95,7 +95,8 @@ function App() {
             cargoType: input.cargoType,
             weightKg: input.weightKg.toString(),
             price: input.price.toString(),
-            details: input.details
+            details: input.details,
+            createdAt: new Date().toISOString()
           }
         }
       }])

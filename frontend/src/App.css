@@ -291,6 +291,7 @@ header h1 {
   padding: 40px;
   text-align: center;
   backdrop-filter: blur(10px);
+  box-sizing: border-box;
 }
 
 .role-box h1 {
@@ -305,8 +306,8 @@ header h1 {
 
 .role-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
   margin-top: 20px;
 }
 
@@ -1000,4 +1001,128 @@ header h1 {
   color: #cbd5e1;
   font-size: 13px;
   line-height: 1.6;
+}/* ═══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — 600px and below
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 600px) {
+
+  /* App container */
+  .app {
+    padding: 12px;
+  }
+
+  /* Header — stack icons */
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .session-info {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* Tabs — make them scroll horizontally if too wide */
+  nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+
+  nav button {
+    flex-shrink: 0;
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  /* Panels & cards take full width */
+  .panel {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* Form grid → single column on mobile */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Card actions stack on small screens */
+  .card-actions {
+    flex-direction: column;
+  }
+
+  .card-actions button {
+    width: 100%;
+  }
+
+  /* Dashboard KPI grid */
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .kpi-value {
+    font-size: 24px;
+  }
+
+  .kpi-label {
+    font-size: 11px;
+  }
+
+  .kpi-hint {
+    font-size: 10px;
+  }
+
+  /* Dashboard charts — stack instead of side by side */
+  .dash-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  /* Dispute amounts table */
+  .dispute-amount-row {
+    font-size: 12px;
+  }
+
+  /* Activity feed text smaller */
+  .activity-text {
+    font-size: 12px;
+  }
+
+  /* Role selector — stack cards vertically on mobile */
+  .role-cards {
+    grid-template-columns: 1fr !important;
+  }
+
+  .role-box {
+    padding: 20px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Why Canton banner */
+  .why-canton {
+    margin-top: 16px;
+    padding: 12px 14px;
+  }
+
+  .why-canton h3 {
+    font-size: 12px;
+  }
+
+  .why-canton p {
+    font-size: 12px;
+  }
 }

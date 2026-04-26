@@ -1,6 +1,8 @@
 module Logistics where
 
 import Daml.Script
+import DA.Time
+import DA.Date
 
 -- ═══════════════════════════════════════════════════════════
 -- TYPES
@@ -26,6 +28,7 @@ template ShipmentProposal
     weightKg : Decimal
     price : Decimal
     details : Text
+    createdAt : Time
   where
     signatory shipper
     observer carrier
@@ -44,6 +47,7 @@ template ShipmentProposal
           weightKg = weightKg
           price = price
           details = details
+          createdAt = createdAt
 
     choice Reject : ()
       controller carrier
@@ -65,6 +69,8 @@ template Shipment
     weightKg : Decimal
     price : Decimal
     details : Text
+    createdAt : Time
+      
   where
     signatory shipper, carrier
 
@@ -81,6 +87,8 @@ template Shipment
           amount = price
           details = details
           isPaid = False
+          createdAt = createdAt
+      
 
 
 -- ═══════════════════════════════════════════════════════════
@@ -101,6 +109,8 @@ template Invoice
     amount : Decimal
     details : Text
     isPaid : Bool
+    createdAt : Time
+      
   where
     signatory carrier, shipper
 
@@ -111,6 +121,7 @@ template Invoice
       do
         assertMsg "Invoice is already paid" (not isPaid)
         create this with isPaid = True
+      
 
     choice RaiseDispute : ContractId Dispute
       with
@@ -121,6 +132,7 @@ template Invoice
         assertMsg "Cannot dispute a paid invoice" (not isPaid)
         assertMsg "Claimed amount must be positive" (claimedAmount > 0.0)
         assertMsg "Claim cannot exceed invoice amount" (claimedAmount <= amount)
+        now <- getTime
         create Dispute with
           shipper = shipper
           carrier = carrier
@@ -132,6 +144,7 @@ template Invoice
           claimedAmount = claimedAmount
           reason = reason
           status = Open
+          createdAt = now
 
 
 -- ═══════════════════════════════════════════════════════════
@@ -150,6 +163,7 @@ template Dispute
     claimedAmount : Decimal
     reason : Text
     status : DisputeStatus
+    createdAt : Time
   where
     signatory shipper, carrier
 
@@ -161,6 +175,7 @@ template Dispute
       controller carrier
       do
         assertMsg "Dispute already resolved" (status == Open)
+        now <- getTime
         create Invoice with
           shipper = shipper
           carrier = carrier
@@ -171,12 +186,14 @@ template Dispute
           amount = claimedAmount
           details = "Settlement after dispute: " <> reason
           isPaid = False
+          createdAt = now
 
     -- Carrier rejects the claim → reissue the original invoice.
     choice RejectClaim : ContractId Invoice
       controller carrier
       do
         assertMsg "Dispute already resolved" (status == Open)
+        now <- getTime
         create Invoice with
           shipper = shipper
           carrier = carrier
@@ -187,6 +204,7 @@ template Dispute
           amount = originalAmount
           details = "Dispute rejected; original amount stands. Reason of dispute: " <> reason
           isPaid = False
+          createdAt = now
 
 
 -- ═══════════════════════════════════════════════════════════
@@ -207,6 +225,7 @@ testLogistics = script do
       weightKg = 800.0
       price = 5000.0
       details = "20ft Container - urgent"
+      createdAt = (time (date 2026 May 1) 10 0 0)
 
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept
@@ -233,6 +252,7 @@ testReject = script do
       weightKg = 1200.0
       price = 8000.0
       details = "Reject scenario test"
+      createdAt = (time (date 2026 May 1) 10 0 0)
 
   submit carrier do
     exerciseCmd proposalId Reject
@@ -253,6 +273,7 @@ testDisputeAccepted = script do
       weightKg = 500.0
       price = 3000.0
       details = "Glass - dispute scenario"
+      createdAt = (time (date 2026 May 1) 10 0 0)
 
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept
@@ -290,6 +311,7 @@ testDisputeRejected = script do
       weightKg = 300.0
       price = 2000.0
       details = "Textile bundle"
+      createdAt = (time (date 2026 May 1) 10 0 0)
 
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept
@@ -325,6 +347,7 @@ testEdgeCases = script do
       weightKg = 200.0
       price = 1500.0
       details = "Edge case scenarios"
+      createdAt = (time (date 2026 May 1) 10 0 0)
 
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept

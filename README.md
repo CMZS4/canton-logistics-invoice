@@ -40,6 +40,21 @@ ChainFreight puts the shipment-to-invoice workflow on **Canton Network** as tamp
 
 ## The Workflow
 
+```mermaid
+stateDiagram-v2
+    [*] --> ShipmentProposal: Shipper creates
+    ShipmentProposal --> Shipment: Carrier Accepts
+    ShipmentProposal --> [*]: Carrier Rejects (archived)
+    Shipment --> Invoice: Carrier issues invoice
+    Invoice --> InvoicePaid: Shipper marks paid
+    Invoice --> Dispute: Shipper raises dispute
+    Dispute --> ReducedInvoice: Carrier accepts claim
+    Dispute --> OriginalInvoice: Carrier rejects claim
+    ReducedInvoice --> InvoicePaid: Shipper pays settlement
+    OriginalInvoice --> InvoicePaid: Shipper pays original
+    InvoicePaid --> [*]
+```
+
 The happy path:
 Shipper creates proposal
 ↓
