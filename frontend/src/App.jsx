@@ -6,7 +6,8 @@ import {
   fetchParties,
   queryContracts,
   submitCommand,
-  parseContract
+  parseContract,
+  isMockMode
 } from './lib/ledger'
 
 import RoleSelector from './components/RoleSelector'
@@ -325,14 +326,21 @@ function App() {
             <button className="logout-btn" onClick={logout}>Switch role</button>
           </div>
         </div>
-        <div className="ledger-status">
-          🟢 Connected to Canton ledger via JSON API
-        </div>
+        {isMockMode() ? (
+          <div className="ledger-status mock-mode">
+            🎬 <strong>Demo Mode</strong> — in-memory simulation for static deploy.
+            The same Daml workflow runs against a real Canton ledger when run locally.
+          </div>
+        ) : (
+          <div className="ledger-status">
+            🟢 Connected to Canton ledger via JSON API
+          </div>
+        )}
       </header>
 
       {error && <div className="error-banner">{error}</div>}
 
-  <nav className="tabs">
+      <nav className="tabs">
         <button
           className={activeTab === 'dashboard' ? 'active' : ''}
           onClick={() => setActiveTab('dashboard')}

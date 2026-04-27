@@ -1126,3 +1126,18 @@ header h1 {
     font-size: 12px;
   }
 }
+/* Mock mode banner — visually distinct from the live status */
+.ledger-status.mock-mode {
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #c4b5fd;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-top: 0.5rem;
+}
+
+.ledger-status.mock-mode strong {
+  color: #ddd6fe;
+}

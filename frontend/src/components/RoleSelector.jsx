@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchParties } from '../lib/ledger'
+import { fetchParties, isMockMode } from '../lib/ledger'
 
 // ═══════════════════════════════════════════════════════════
 // ROLE SELECTOR (login screen)
@@ -77,9 +77,16 @@ export default function RoleSelector({ onSelect }) {
           </>
         )}
 
-        <div className="ledger-status" style={{ marginTop: '24px' }}>
-          🟢 Connected to Canton ledger via JSON API
-        </div>
+        {isMockMode() ? (
+          <div className="ledger-status mock-mode" style={{ marginTop: '24px' }}>
+            🎬 <strong>Demo Mode</strong> — in-memory simulation for static deploy.
+            The same Daml workflow runs against a real Canton ledger when run locally.
+          </div>
+        ) : (
+          <div className="ledger-status" style={{ marginTop: '24px' }}>
+            🟢 Connected to Canton ledger via JSON API
+          </div>
+        )}
 
         <div className="why-canton">
           <h3>Why a ledger, not a database?</h3>
