@@ -1,12 +1,29 @@
 # ChainFreight
 
-**Proof, not promises.** Tamper-proof shipment & invoice workflow on Canton Network.
+**Stop reconciling spreadsheets. Start agreeing on a single source of truth.**
+
+Tamper-proof shipment & invoice workflow on Canton Network — proof, not promises.
 
 > HackCanton League Season #1 — RWA & Business Workflows Track
 
+## TL;DR — demo in 30 seconds
+
+1. Pick a role (Shipper or Carrier) on the live Canton ledger
+2. Shipper creates a shipment proposal
+3. Switch role → Carrier accepts → Shipment contract created
+4. Carrier issues an invoice
+5. Shipper raises a dispute on the invoice
+6. Carrier resolves the dispute (accept claim / reject claim)
+7. Final invoice paid → Dashboard updates in real time
+
+→ **Every step is a real Canton transaction.**
+→ **No backend reconciliation. The ledger is the workflow.**
+
 ## Why a ledger, not a database?
 
-Two parties — a shipper and a carrier — need to agree on what was shipped, what was invoiced, what was paid, and what's in dispute. Today they reconcile this across WhatsApp, Excel, and email, and lose 3–5 hours a week on it. A traditional database doesn't solve that, because *whose* database is it? Whoever owns the database can edit the record.
+Today, Murat — operations manager at a Turkish freight forwarder — spends 3 to 5 hours a week arguing over invoices he cannot prove. WhatsApp screenshots, edited Excels, mismatched email threads. A shipper and a carrier disagree on what was shipped, what was invoiced, what was paid, and what's in dispute, and there's no shared record either side can trust.
+
+A traditional database doesn't solve that, because *whose* database is it? Whoever owns it can edit the record.
 
 ChainFreight runs the workflow as Daml smart contracts on Canton, where:
 
@@ -15,6 +32,14 @@ ChainFreight runs the workflow as Daml smart contracts on Canton, where:
 - **The state machine cannot be bypassed.** `assertMsg` checks (no double-pay, no dispute on a paid invoice, no claim above the invoice amount) live on the ledger, so the UI is just a thin client over a tamper-proof workflow.
 
 This is what a ledger gives you that a database cannot.
+
+## What makes this different?
+
+No backend database.
+No reconciliation jobs.
+No "source of truth" debates.
+
+The ledger *is* the workflow. Every state transition is a signed Canton transaction. There is no off-ledger version to argue with.
 
 [![Daml Tests](https://img.shields.io/badge/daml%20tests-4%20passing-success?style=flat-square)]()
 [![Choice Coverage](https://img.shields.io/badge/choice%20coverage-63%25-yellow?style=flat-square)]()
@@ -328,6 +353,17 @@ What you'll see in the live demo:
 
 ---
 
+## Why Canton wins here
+
+This problem is not about automation.
+
+It's about **agreement**.
+
+A database automates your version of the truth.
+Canton lets multiple parties agree on a shared truth — with cryptographic signatures, selective disclosure, and a state machine that no single party can rewrite.
+
+That's the difference between automating a workflow and trusting it.
+
 ## What's Real, What's Next
 
 **Live today:**
@@ -340,8 +376,20 @@ What you'll see in the live demo:
 **Next:**
 - Deploy to Canton devnet (live network)
 - Pilot with one real freight forwarder for production validation
-- Additional workflows: proof-of-delivery, customs paperwork, document attachment
-- Optional auditor party for selective disclosure of disputes to a neutral third party
+
+## Future Extensions
+
+The MVP focuses on the multi-party state machine. A production deployment would naturally extend it with:
+
+- **Proof of Delivery (PoD)** as a new state between `Shipment` and `Invoice`. The carrier would submit a signed PoD record (timestamp, location, recipient signature hash) before an invoice can be issued — preventing premature billing and matching the real freight-forwarding workflow.
+- **Document attachments** (bill of lading, weighing tickets, customs paperwork) stored off-ledger on IPFS or S3, with their SHA-256 hashes recorded on-ledger as immutable proof of document existence at a specific time.
+- **Mediation / auditor party** as a third signatory on the `Dispute` template. When both parties disagree on the resolution (e.g. shipper rejects the carrier's `RejectClaim`), an industry chamber or arbitrator can break the deadlock without leaving the ledger.
+- **Tax & VAT fields** on the `Invoice` template (`vatRate`, `vatAmount`, `taxId`, `currency`) — required by Turkish KDV regulations and most EU jurisdictions for legal invoice archival.
+- **Sequential invoice numbers** (zorunlu in Turkey) and per-jurisdiction legal numbering rules.
+- **Partial payment / partial damage** flows. Currently dispute resolution issues a single new invoice; partial-payment would let an invoice accumulate multiple `MarkPaid` events until fully settled.
+- **Streaming subscription API** instead of the 3-second polling used today. Canton supports gRPC streaming and PQS projections that would scale far better than the current REST-based approach.
+
+These are deliberately deferred from the MVP to keep the demo focused on the core insight: **the multi-party state machine has to be on a shared ledger.** Once that's accepted, the rest are straightforward Daml record additions.
 
 ---
 
