@@ -80,36 +80,45 @@ stateDiagram-v2
 ```
 
 The happy path:
+
+```
 Shipper creates proposal
-↓
+         ↓
 Carrier accepts → Shipment contract (or rejects, archived)
-↓
+         ↓
 Carrier issues Invoice
-↓
+         ↓
 Shipper marks paid → isPaid: true
+```
 
 The dispute path (when something goes wrong):
+
+```
 …Invoice exists
-↓
+         ↓
 Shipper raises Dispute (reason + claimed amount)
-↓
+         ↓
 Carrier resolves:
-├─ AcceptClaim → reduced Invoice
-└─ RejectClaim → original Invoice reissued
-↓
+   ├─ AcceptClaim → reduced Invoice
+   └─ RejectClaim → original Invoice reissued
+         ↓
 Shipper pays the resolved Invoice
+```
 
 Every transition is a real Canton transaction signed by the required parties. The on-ledger state machine — not the UI — decides what is allowed.
 
 ---
 
 ## Architecture
+
+```
 React + Vite Frontend
-↓
+        ↓
 Canton JSON Ledger API (port 7575)
-↓
+        ↓
 Canton Sandbox + Daml contracts
 (ShipmentProposal · Shipment · Invoice · Dispute)
+```
 
 ---
 
@@ -202,9 +211,9 @@ The first four scenarios cover the happy path and the dispute branches. **`testE
 Each failure path is enforced by an `assertMsg` or `ensure` clause inside the contract, not by the UI. A misbehaving client cannot bypass them.
 
 ## Smart Contracts
-         
 
 Four Daml templates, all live on ledger.
+
 
 ### ShipmentProposal
 - **Signatory:** Shipper
@@ -255,28 +264,54 @@ Concretely:
 
 The state machine is the **single source of truth** — there is no ambiguity about "which invoice should I pay?" because there is exactly one active invoice at every step.
 
-You can verify this from `daml test` output:testReject:           0 active contracts, 2 transactions
+You can verify this from `daml test` output:
+
+```
+testReject:           0 active contracts, 2 transactions
 testLogistics:        1 active contracts, 4 transactions
 testDisputeAccepted:  1 active contracts, 6 transactions
 testDisputeRejected:  1 active contracts, 6 transactions
 testEdgeCases:        1 active contracts, 8 transactions
+```
 
 `testReject` proves the consuming pattern: a proposal was created and rejected; the resulting active-contract count is **zero**. If old contracts were lingering, this would not be possible. Adding an explicit `archive self` to a consuming choice would cause Daml to fail with `Attempt to exercise a contract that was consumed in the same transaction` — Daml's type system catches the double-archive at runtime.
 
 > Note: On Windows CMD, the Turkish locale can cause a `DAML-LF Name "SCRİPT"` parsing error. Run tests in WSL/Ubuntu or set `JAVA_TOOL_OPTIONS=-Duser.language=en` first.
 
 ---
+## Live demo vs. local sandbox
 
+ChainFreight runs in two modes against the **same Daml package**:
+
+**Local mode** (real Canton sandbox):
+The frontend talks to a Canton sandbox running on `localhost:7575`.
+Every action is a signed Canton transaction. This is the real
+system — see Quick Start above to run it yourself.
+
+**Demo mode** (`VITE_MOCK_MODE=true`, used on Vercel):
+A static deploy uses an in-memory simulation of the same state
+machine, because a sandbox running on a developer laptop isn't
+reachable from the public internet. The UI behavior, validations,
+and consuming-choice semantics are reproduced for demo purposes —
+**but the real ledger runs the actual Daml package, unchanged.**
+
+The mock layer exists only because the real ledger needs a
+locally-running participant node. The smart contracts, signatory
+rules, and state machine you see in `daml/Logistics.daml` are
+what run on Canton.
 ## Demo
 
 **Live demo:** _[deployed URL coming soon]_
 
-**Walkthrough video** (46 seconds): [https://youtu.be/HT-yrPHfErk](https://youtu.be/HT-yrPHfErk)
+
+**Walkthrough video** (older version, to be re-recorded): [https://youtu.be/HT-yrPHfErk](https://youtu.be/HT-yrPHfErk)
 
 What you'll see in the live demo:
 - A role selector that pulls real party IDs from `/v2/parties`
 - Each role only sees actions it is authorized to perform on the ledger
 - Every click triggers a real Canton transaction with toast feedback
+- Full dispute lifecycle: raise → resolve → settlement
+
 ---
 
 ## Project Status
