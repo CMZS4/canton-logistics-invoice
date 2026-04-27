@@ -6,6 +6,11 @@ Tamper-proof shipment & invoice workflow on Canton Network — proof, not promis
 
 > HackCanton League Season #1 — RWA & Business Workflows Track
 
+[![Daml Tests](https://img.shields.io/badge/daml%20tests-5%20passing-success?style=flat-square)]()
+[![Templates](https://img.shields.io/badge/templates-4-blue?style=flat-square)]()
+[![Canton](https://img.shields.io/badge/canton-3.4.11-purple?style=flat-square)]()
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)]()
+
 ## TL;DR — demo in 30 seconds
 
 1. Pick a role (Shipper or Carrier) on the live Canton ledger
@@ -40,12 +45,6 @@ No reconciliation jobs.
 No "source of truth" debates.
 
 The ledger *is* the workflow. Every state transition is a signed Canton transaction. There is no off-ledger version to argue with.
-
-[![Daml Tests](https://img.shields.io/badge/daml%20tests-4%20passing-success?style=flat-square)]()
-[![Choice Coverage](https://img.shields.io/badge/choice%20coverage-63%25-yellow?style=flat-square)]()
-[![Templates](https://img.shields.io/badge/templates-4-blue?style=flat-square)]()
-[![Canton](https://img.shields.io/badge/canton-3.4.11-purple?style=flat-square)]()
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)]()
 
 ---
 
@@ -105,19 +104,12 @@ Every transition is a real Canton transaction signed by the required parties. Th
 ---
 
 ## Architecture
-┌─────────────────────────────────────────┐
-│   React + Vite Frontend                 │
-│   (Shipper / Carrier / Invoice panels)  │
-└──────────────┬──────────────────────────┘
-│ HTTP via Vite proxy
-┌──────────────▼──────────────────────────┐
-│   Canton JSON Ledger API (port 7575)    │
-└──────────────┬──────────────────────────┘
-│
-┌──────────────▼──────────────────────────┐
-│   Canton Sandbox + Daml contracts       │
-│   ShipmentProposal · Shipment · Invoice │
-└─────────────────────────────────────────┘
+React + Vite Frontend
+↓
+Canton JSON Ledger API (port 7575)
+↓
+Canton Sandbox + Daml contracts
+(ShipmentProposal · Shipment · Invoice · Dispute)
 
 ---
 
@@ -156,7 +148,7 @@ Once a shipment is in transit, the carrier can issue an invoice — both shipper
 ### Shipper raises a dispute
 If something went wrong, the shipper raises a dispute with a reason and a claimed amount — capped at the original invoice on-ledger.
 
-![Raise dispute](docs/05-raise-dispute.png.jpeg)
+![Raise dispute](docs/screenshots/05-raise-dispute.png.jpeg)
 
 ### Carrier resolves the dispute
 The carrier accepts the claim (reduced invoice issued) or rejects it (original amount stands). Either path is enforced as a Daml choice.
@@ -200,6 +192,15 @@ daml test
 
 You should see all five scenarios pass: `testLogistics`, `testReject`, `testDisputeAccepted`, `testDisputeRejected`, `testEdgeCases`.
 
+The first four scenarios cover the happy path and the dispute branches. **`testEdgeCases` exists specifically to prove that the ledger rejects abuse**, using `submitMustFail` to assert that the following commands all fail at submission time:
+
+- claiming more than the original invoice amount (over-claim)
+- claiming zero or a negative amount
+- raising a dispute on an already-paid invoice
+- marking an invoice paid twice (double-pay)
+
+Each failure path is enforced by an `assertMsg` or `ensure` clause inside the contract, not by the UI. A misbehaving client cannot bypass them.
+
 ## Smart Contracts
          
 
@@ -237,11 +238,13 @@ The Dispute template is the difference between a happy-path demo and a real B2B 
 - `claimedAmount <= amount` is enforced inside `RaiseDispute`, not in the UI.
 - All `assertMsg` checks (double-pay, dispute on already-paid invoice, status-already-resolved) run on the ledger — the UI cannot bypass them.
 
-### A note on contract lifecycle
+### A note on contract lifecycle (and a common misreading)
 
-A common question: "do these contracts get archived after they're resolved?"
+Reviewers sometimes ask: "do these contracts get archived after they're resolved? I don't see `archive self` in the code, so isn't the old contract still active alongside the new one?"
 
-Yes — automatically. In Daml, choices are **consuming by default**, which means the contract on which a choice is exercised is archived as part of the same transaction. So:
+No — and adding `archive self` would actually be a bug. In Daml, choices are **consuming by default**, which means the contract on which the choice is exercised is archived as part of the same transaction. There is exactly one active contract representing the workflow at any moment.
+
+Concretely:
 
 - `Accept` archives the `ShipmentProposal` and creates a `Shipment`.
 - `Reject` archives the `ShipmentProposal` with no replacement.
@@ -250,64 +253,17 @@ Yes — automatically. In Daml, choices are **consuming by default**, which mean
 - `RaiseDispute` archives the `Invoice` and creates a `Dispute`.
 - `AcceptClaim` / `RejectClaim` archives the `Dispute` and creates a fresh `Invoice` (reduced or original).
 
-You can verify this from `daml test` output: `testReject` ends with `0 active contracts, 2 transactions` — the proposal was created and archived, leaving nothing behind. Adding an explicit `archive self` would actually be a bug; Daml would reject it as a double-archive in the same transaction.
+The state machine is the **single source of truth** — there is no ambiguity about "which invoice should I pay?" because there is exactly one active invoice at every step.
 
-## Running Tests
+You can verify this from `daml test` output:testReject:           0 active contracts, 2 transactions
+testLogistics:        1 active contracts, 4 transactions
+testDisputeAccepted:  1 active contracts, 6 transactions
+testDisputeRejected:  1 active contracts, 6 transactions
+testEdgeCases:        1 active contracts, 8 transactions
 
-Daml smart contracts ship with a happy-path test suite:
-
-```bash
-daml test
-```
-
-Expected output:
-daml/Logistics.daml:testLogistics: ok, 1 active contracts, 4 transactions.
-
-Tests cover the full workflow: `ShipmentProposal → Accept → Shipment → CreateInvoice → Invoice → MarkPaid`. The `assertMsg` guard against double-payment is exercised by the test scenario.
+`testReject` proves the consuming pattern: a proposal was created and rejected; the resulting active-contract count is **zero**. If old contracts were lingering, this would not be possible. Adding an explicit `archive self` to a consuming choice would cause Daml to fail with `Attempt to exercise a contract that was consumed in the same transaction` — Daml's type system catches the double-archive at runtime.
 
 > Note: On Windows CMD, the Turkish locale can cause a `DAML-LF Name "SCRİPT"` parsing error. Run tests in WSL/Ubuntu or set `JAVA_TOOL_OPTIONS=-Duser.language=en` first.
-
----
-
-## Running Locally
-
-### Prerequisites
-
-- Ubuntu (WSL2 on Windows works)
-- Daml SDK 3.4.11 — `curl -sSL https://get.daml.com/ | sh`
-- Node 20+
-
-### Start the ledger
-
-```bash
-daml start
-```
-
-This compiles the DAR, starts the Canton sandbox on port 6865, and exposes the JSON API on port 7575.
-
-### Create the parties (once)
-
-```bash
-curl -X POST http://localhost:7575/v2/parties \
-  -H "Content-Type: application/json" \
-  -d '{"partyIdHint":"Shipper","displayName":"Murat Logistics"}'
-
-curl -X POST http://localhost:7575/v2/parties \
-  -H "Content-Type: application/json" \
-  -d '{"partyIdHint":"Carrier","displayName":"FastFreight"}'
-```
-
-Copy the returned `party` values into `frontend/src/App.jsx` (`SHIPPER` and `CARRIER` constants).
-
-### Run the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open http://localhost:5173 — you should see "🟢 Connected to Canton ledger via JSON API" at the top.
 
 ---
 
@@ -325,7 +281,7 @@ What you'll see in the live demo:
 
 ## Project Status
 
-- [x] Daml smart contracts — 4 templates, 4 test scenarios, 63% choice coverage
+- [x] Daml smart contracts — 4 templates, 5 test scenarios, ledger-side validation
 - [x] Canton sandbox running locally
 - [x] JSON API integration verified via `curl`
 - [x] React frontend connected to live ledger
@@ -352,6 +308,20 @@ What you'll see in the live demo:
 **Market:** ~2,700 SME freight forwarders in Turkey alone, part of an industry where manual reconciliation and documentation errors are a major cost center.
 
 ---
+
+## Architecture & Design Decisions
+
+A few things in the codebase look like shortcuts but are deliberate. Documenting them so reviewers don't have to guess:
+
+**Party discovery via partyIdHint prefix.** The frontend looks up parties by matching the `partyIdHint` prefix (`Shipper::…`, `Carrier::…`) against the `/v2/parties` response. This works against a Canton sandbox where parties are allocated with known hints. A production deployment would replace this with authenticated identity (JWT/OAuth) and a proper user-to-party mapping service. The sandbox-only pattern keeps the demo path uncluttered.
+
+**Polling instead of streaming.** The frontend refreshes via `/v2/state/active-contracts` every 3 seconds. Canton supports gRPC streaming and PQS projections that scale far better, but they add infrastructure (a streaming client, an event consumer) that doesn't change the user-visible workflow. Polling was the right tradeoff for a 21-day MVP. See "Future Extensions" for the production path.
+
+**Frontend guards are UX, not security.** The UI hides the "Mark as Paid" button from the carrier and the "Accept claim" button from the shipper. This is for clarity, not safety. The actual authorization is enforced by Daml signatories and choice controllers — the ledger rejects any unauthorized command, regardless of which UI sent it. Hand-rolled curl against the JSON API would hit the same wall.
+
+**Per-template field duplication (origin, destination, etc.).** Each template carries its own copy of the freight metadata. A normalized reference model would be cleaner, but it would also require either a separate "ShipmentRef" template or a reference parameter pattern that complicates the choice signatures. For an MVP this duplication is intentional — the cost is a few extra fields, the benefit is templates that read top-to-bottom without indirection.
+
+**`createdAt` carries through the workflow.** The `createdAt` timestamp on `ShipmentProposal` propagates onto the `Shipment` and the original `Invoice`, but choices that *create new contracts* in the dispute flow (`AcceptClaim`, `RejectClaim`) stamp them with `getTime` at exercise time. So `createdAt` answers two related but distinct questions: "when was the workflow opened?" (proposal time) and "when was this specific invoice issued?" (exercise time for post-dispute invoices). A future version could split these into `workflowStartedAt` and `issuedAt` for clarity.
 
 ## Why Canton wins here
 

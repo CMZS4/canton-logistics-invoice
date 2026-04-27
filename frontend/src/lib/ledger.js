@@ -1,6 +1,13 @@
 // ═══════════════════════════════════════════════════════════
 // CANTON LEDGER API CLIENT
 // ═══════════════════════════════════════════════════════════
+//
+// All commands sent through submitCommand are authorized
+// by the ledger itself, not by this client. Daml signatory
+// and controller rules reject any unauthorized exercise —
+// the role-aware UI is a UX layer, not a security layer.
+// See "Architecture & Design Decisions" in the README.
+// ═══════════════════════════════════════════════════════════
 
 const API_BASE = ''
 
