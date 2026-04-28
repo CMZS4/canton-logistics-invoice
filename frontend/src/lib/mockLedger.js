@@ -33,6 +33,7 @@ const SEED_CONTRACTS = () => [
       cargoType: 'Electronics',
       weightKg: '800',
       price: '4500',
+      currency: 'USD',
       details: '20ft container, urgent route',
       createdAt: new Date(Date.now() - 86400000).toISOString(),
     },
@@ -48,6 +49,7 @@ const SEED_CONTRACTS = () => [
       cargoType: 'Textiles',
       weightKg: '300',
       amount: '2000',
+      currency: 'USD',
       details: 'Bi-weekly textile delivery',
       isPaid: false,
       createdAt: new Date(Date.now() - 7200000).toISOString(),
@@ -150,6 +152,7 @@ const createSettlementInvoice = (dispute, amount, details) =>
     cargoType: dispute.payload.cargoType,
     weightKg: dispute.payload.weightKg,
     amount,
+    currency: dispute.payload.currency || 'USD',
     details,
     isPaid: false,
     createdAt: nowIso(),
@@ -195,8 +198,13 @@ export const submitMockCommand = async (party, command) => {
         throw new Error('Only the carrier can accept this proposal')
       }
       // ShipmentProposal → Shipment
+      // Explicitly carry currency through so invoice/dispute
+      // panels can display the correct symbol downstream.
       archive(contractId)
-      const newCid = create('Shipment', { ...c.payload })
+      const newCid = create('Shipment', {
+        ...c.payload,
+        currency: c.payload.currency || 'USD',
+      })
       return { contractId: newCid }
     }
 
@@ -222,6 +230,7 @@ export const submitMockCommand = async (party, command) => {
         cargoType: c.payload.cargoType,
         weightKg: c.payload.weightKg,
         amount: c.payload.price,
+        currency: c.payload.currency || 'USD',
         details: c.payload.details,
         isPaid: false,
         createdAt: c.payload.createdAt || nowIso(),
@@ -262,6 +271,7 @@ export const submitMockCommand = async (party, command) => {
         originalAmount: c.payload.amount,
         claimedAmount: claimed.toString(),
         reason: argument.reason,
+        currency: c.payload.currency || 'USD',
         status: { tag: 'Open', value: {} },
         createdAt: nowIso(),
       })

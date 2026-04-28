@@ -96,6 +96,7 @@ function App() {
             cargoType: input.cargoType,
             weightKg: input.weightKg.toString(),
             price: input.price.toString(),
+            currency: input.currency || 'USD',
             details: input.details,
             createdAt: new Date().toISOString()
           }

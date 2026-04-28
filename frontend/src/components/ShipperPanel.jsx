@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { currencySymbol } from '../lib/ledger'
 
 // ═══════════════════════════════════════════════════════════
 // SHIPPER PANEL
@@ -14,6 +15,7 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
   const [weightKg, setWeightKg] = useState('')
   const [price, setPrice] = useState('')
   const [details, setDetails] = useState('')
+  const [currency, setCurrency] = useState('USD')
 
   const handleSubmit = () => {
     if (!origin || !destination || !cargoType || !weightKg || !price) return
@@ -23,6 +25,7 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
       cargoType,
       weightKg: parseFloat(weightKg),
       price: parseFloat(price),
+      currency,
       details: details || `${cargoType} from ${origin} to ${destination}`
     })
     setOrigin('')
@@ -67,7 +70,7 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
         />
         <input
           type="number"
-          placeholder="Price (USD)"
+          placeholder="Price"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           disabled={loading}
@@ -79,6 +82,16 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
           onChange={(e) => setDetails(e.target.value)}
           disabled={loading}
         />
+        <select
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          disabled={loading}
+          className="currency-select"
+        >
+          <option value="USD">$ USD</option>
+          <option value="TRY">₺ TRY</option>
+          <option value="EUR">€ EUR</option>
+        </select>
         <button
           className="form-submit"
           onClick={handleSubmit}
@@ -102,7 +115,7 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
               <span className="meta-pill">{parseFloat(p.fields.weightKg).toFixed(0)} kg</span>
             </p>
             <p>Carrier: FastFreight Ltd.</p>
-            <p>Price: ${parseFloat(p.fields.price).toLocaleString('en-US')}</p>
+            <p>Price: {currencySymbol(p.fields.currency)}{parseFloat(p.fields.price).toLocaleString('en-US')}</p>
             {p.fields.details && p.fields.details !== `${p.fields.cargoType} from ${p.fields.origin} to ${p.fields.destination}` && (
               <p className="card-notes">"{p.fields.details}"</p>
             )}

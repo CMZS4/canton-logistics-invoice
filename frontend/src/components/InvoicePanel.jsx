@@ -7,6 +7,8 @@ import { useState } from 'react'
 // or Raise a Dispute. Carrier sees the waiting state.
 // ═══════════════════════════════════════════════════════════
 
+import { currencySymbol } from '../lib/ledger'
+
 export default function InvoicePanel({
   invoices,
   isShipper,
@@ -66,7 +68,7 @@ export default function InvoicePanel({
               </p>
               <p>Shipper: Murat Logistics Inc.</p>
               <p>Carrier: FastFreight Ltd.</p>
-              <p className="amount">${fullAmount.toLocaleString('en-US')}</p>
+              <p className="amount">{currencySymbol(inv.fields.currency)}{fullAmount.toLocaleString('en-US')}</p>
               {inv.fields.details && (
                 <p className="card-notes">"{inv.fields.details}"</p>
               )}
@@ -104,7 +106,7 @@ export default function InvoicePanel({
                   />
                   <input
                     type="number"
-                    placeholder={`Claimed amount (max $${fullAmount.toLocaleString('en-US')})`}
+                    placeholder={`Claimed amount (max ${currencySymbol(inv.fields.currency)}${fullAmount.toLocaleString('en-US')})`}
                     value={claimedAmount}
                     onChange={(e) => setClaimedAmount(e.target.value)}
                     disabled={loading}

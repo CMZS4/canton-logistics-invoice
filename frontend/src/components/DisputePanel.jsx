@@ -7,6 +7,8 @@
 // (original amount stands).
 // ═══════════════════════════════════════════════════════════
 
+import { currencySymbol } from '../lib/ledger'
+
 export default function DisputePanel({
   disputes,
   isShipper,
@@ -51,19 +53,19 @@ export default function DisputePanel({
                 <div className="dispute-amount-row">
                   <span className="amount-label">Original invoice</span>
                   <span className="amount-strikethrough">
-                    ${original.toLocaleString('en-US')}
+                    {currencySymbol(d.fields.currency)}{original.toLocaleString('en-US')}
                   </span>
                 </div>
                 <div className="dispute-amount-row">
                   <span className="amount-label">Shipper claims</span>
                   <span className="amount-claim">
-                    ${claimed.toLocaleString('en-US')}
+                    {currencySymbol(d.fields.currency)}{claimed.toLocaleString('en-US')}
                   </span>
                 </div>
                 <div className="dispute-amount-row reduction-row">
                   <span className="amount-label">Disputed reduction</span>
                   <span className="amount-reduction">
-                    −${reduction.toLocaleString('en-US')}
+                    −{currencySymbol(d.fields.currency)}{reduction.toLocaleString('en-US')}
                   </span>
                 </div>
               </div>

@@ -188,3 +188,10 @@ export function parseContract(entry) {
 // Re-export for components that need to know which mode we're in
 // (e.g. to show a "demo mode" banner in the UI).
 export { isMockMode } from './mockLedger'
+// ─── Currency helper ───────────────────────────────────────
+// Maps currency codes to display symbols. Used by all panels
+// to render amounts consistently. Defaults to $ if unknown.
+export function currencySymbol(currency) {
+  const symbols = { USD: '$', TRY: '₺', EUR: '€' }
+  return symbols[currency] || '$'
+}

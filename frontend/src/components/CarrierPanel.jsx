@@ -5,6 +5,8 @@
 // and active shipments (with Create Invoice action).
 // ═══════════════════════════════════════════════════════════
 
+import { currencySymbol } from '../lib/ledger'
+
 export default function CarrierPanel({
   proposals,
   shipments,
@@ -29,7 +31,7 @@ export default function CarrierPanel({
               <span className="meta-pill">{parseFloat(p.fields.weightKg).toFixed(0)} kg</span>
             </p>
             <p>Shipper: Murat Logistics Inc.</p>
-            <p>Price: ${parseFloat(p.fields.price).toLocaleString('en-US')}</p>
+            <p>Price: {currencySymbol(p.fields.currency)}{parseFloat(p.fields.price).toLocaleString('en-US')}</p>
             {p.fields.details && (
               <p className="card-notes">"{p.fields.details}"</p>
             )}
@@ -67,7 +69,7 @@ export default function CarrierPanel({
               <span className="meta-pill">{s.fields.weightKg} kg</span>
             </p>
             <p>Shipper: Murat Logistics Inc.</p>
-            <p>Amount: ${parseFloat(s.fields.price).toLocaleString('en-US')}</p>
+            <p>Amount: {currencySymbol(s.fields.currency)}{parseFloat(s.fields.price).toLocaleString('en-US')}</p>
             <p className="ledger-id">⛓ Contract: {s.contractId.slice(0, 20)}…</p>
             <button onClick={() => onCreateInvoice(s.contractId)} disabled={loading}>
               {loading ? 'Processing…' : '📄 Create Invoice'}
