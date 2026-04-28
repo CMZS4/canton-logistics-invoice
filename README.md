@@ -38,7 +38,25 @@ ChainFreight runs the workflow as Daml smart contracts on Canton, where:
 - **Selective disclosure is enforced by the ledger.** Each role only sees the contracts they're authorized to see — not by hiding things in the UI, but by signatory and observer rules in the Daml code.
 - **The state machine cannot be bypassed.** `assertMsg` checks (no double-pay, no dispute on a paid invoice, no claim above the invoice amount) live on the ledger, so the UI is just a thin client over a tamper-proof workflow.
 
-This is what a ledger gives you that a database cannot.
+## Why Canton, not Postgres / Ethereum / Hyperledger?
+
+A fair question. ChainFreight needs **shared truth across companies that don't fully trust each other** — that ruled out three plausible alternatives:
+
+| | What it does well | Why it doesn't fit |
+|---|---|---|
+| 🗄️ **Postgres** | Fast, familiar, perfect for centralized apps with one operator. | Whoever owns the database becomes the source of truth. Disputes return to *"whose version is right?"* — the exact problem we're solving. |
+| ⛓️ **Ethereum** | Strong public verifiability, composable smart contracts, settlement guarantees. | Shipment prices, customer terms, and counterparty data don't belong on a public chain. B2B workflows need **confidentiality** as much as integrity. |
+| 🏢 **Hyperledger** | Permissioned enterprise networks, configurable governance. | Privacy and selective disclosure require manual design at the application layer. Canton gives the same outcome with a cleaner native model. |
+| ✅ **Canton** | **Multi-party workflows with native privacy, selective disclosure, and cryptographic co-signing — designed for B2B coordination from day one.** | *— this is what we picked* |
+
+**Why Canton's fit is structural, not stylistic:**
+
+- 🔐 **Multi-party authorization** — every state transition (Accept, CreateInvoice, RaiseDispute, AcceptClaim) is co-signed. No single party rewrites history.
+- 👁️ **Privacy by default** — only the parties on a contract see it. The carrier doesn't see another shipper's invoices; the network doesn't see anyone's prices.
+- 🧩 **Selective disclosure** — adding a customs broker or freight forwarder later doesn't require redesigning who sees what.
+
+> Postgres scales the operator. Ethereum scales the public.  
+> **Canton scales the agreement** — which is what logistics actually needs.
 
 ## What makes this different?
 
