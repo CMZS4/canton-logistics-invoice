@@ -28,14 +28,41 @@ const API_BASE = ''
 const cmdId = () =>
   `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
+// ─── HTTP helper ───────────────────────────────────────────
+// Wraps fetch with proper error handling for the real Canton
+// path. Without this, a 4xx/5xx response would throw a cryptic
+// "Cannot read property X of undefined" because we'd try to
+// parse error responses as if they were successful JSON.
+// Mock mode bypasses this entirely — see isMockMode() branches.
+const FETCH_TIMEOUT_MS = 5000
+
+async function fetchJson(url, options = {}) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '(no body)')
+      throw new Error(`Ledger ${res.status}: ${body}`)
+    }
+    return await res.json()
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error(`Ledger request timed out after ${FETCH_TIMEOUT_MS}ms`)
+    }
+    throw e
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 // ─── Public API ────────────────────────────────────────────
 
 export async function fetchParties() {
   if (isMockMode()) {
     return await getMockParties()
   }
-  const res = await fetch(`${API_BASE}/v2/parties`)
-  const data = await res.json()
+  const data = await fetchJson(`${API_BASE}/v2/parties`)
   return data.partyDetails || []
 }
 
@@ -43,8 +70,7 @@ export async function getLedgerEnd() {
   if (isMockMode()) {
     return 'mock-offset'
   }
-  const res = await fetch(`${API_BASE}/v2/state/ledger-end`)
-  const data = await res.json()
+  const data = await fetchJson(`${API_BASE}/v2/state/ledger-end`)
   return data.offset
 }
 
@@ -66,7 +92,7 @@ export async function queryContracts(asParty) {
   }
 
   const offset = await getLedgerEnd()
-  const res = await fetch(`${API_BASE}/v2/state/active-contracts`, {
+  const data = await fetchJson(`${API_BASE}/v2/state/active-contracts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -87,7 +113,6 @@ export async function queryContracts(asParty) {
       activeAtOffset: offset,
     }),
   })
-  const data = await res.json()
   return data || []
 }
 
@@ -120,7 +145,7 @@ export async function submitCommand(asParty, commands) {
     }
   }
 
-  const res = await fetch(`${API_BASE}/v2/commands/submit-and-wait`, {
+  const data = await fetchJson(`${API_BASE}/v2/commands/submit-and-wait`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -130,7 +155,6 @@ export async function submitCommand(asParty, commands) {
       commands,
     }),
   })
-  const data = await res.json()
   if (!data.updateId) {
     throw new Error(data.errors?.[0] || JSON.stringify(data))
   }

@@ -8,9 +8,13 @@ import DA.Date
 -- TYPES
 -- ═══════════════════════════════════════════════════════════
 
+-- Currently only Open is reachable; Dispute archives via
+-- consuming AcceptClaim/RejectClaim choices rather than a
+-- Resolved transition. Kept as a tagged union so future
+-- non-consuming resolution paths can extend without breaking
+-- the existing wire format.
 data DisputeStatus
   = Open
-  | Resolved
   deriving (Eq, Show)
 
 
@@ -29,6 +33,11 @@ template ShipmentProposal
     price : Decimal
     details : Text
     createdAt : Time
+      -- NOTE: createdAt is set client-side by the submitter for
+      -- the hackathon MVP. For production, this should be hoisted
+      -- into an Initiate choice that calls getTime, removing the
+      -- ability for clients to backdate or postdate proposals.
+      -- See "Future Extensions" in README.
   where
     signatory shipper
     observer carrier

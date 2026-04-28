@@ -12,8 +12,80 @@
 // the real ledger enforces all of this cryptographically.
 // ═══════════════════════════════════════════════════════════
 
-let contractIdCounter = 1
+// ─── Persistence layer ────────────────────────────────────
+// Mock state persists to localStorage so jury/users can refresh
+// the page without losing the workflow they built up. State
+// resets only on explicit "reset" or by clearing browser storage.
+const STORAGE_KEY = 'chainfreight_mock_ledger_v1'
+
+// Sample seed data so the app isn't empty on first visit.
+// Demonstrates an active shipment + an unpaid invoice already
+// in flight — gives the jury a populated view immediately.
+const SEED_CONTRACTS = () => [
+  {
+    contractId: 'mock-seed-shipment-1',
+    template: 'Shipment',
+    payload: {
+      shipper: 'Shipper::mock-1220abcdef1234567890',
+      carrier: 'Carrier::mock-1220fedcba0987654321',
+      origin: 'Istanbul',
+      destination: 'Ankara',
+      cargoType: 'Electronics',
+      weightKg: '800',
+      price: '4500',
+      details: '20ft container, urgent route',
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
+    },
+  },
+  {
+    contractId: 'mock-seed-invoice-1',
+    template: 'Invoice',
+    payload: {
+      shipper: 'Shipper::mock-1220abcdef1234567890',
+      carrier: 'Carrier::mock-1220fedcba0987654321',
+      origin: 'Izmir',
+      destination: 'Bursa',
+      cargoType: 'Textiles',
+      weightKg: '300',
+      amount: '2000',
+      details: 'Bi-weekly textile delivery',
+      isPaid: false,
+      createdAt: new Date(Date.now() - 7200000).toISOString(),
+    },
+  },
+]
+
+const loadState = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return { contracts: SEED_CONTRACTS(), counter: 100 }
+    const parsed = JSON.parse(raw)
+    if (!parsed.contracts || parsed.contracts.length === 0) {
+      return { contracts: SEED_CONTRACTS(), counter: parsed.counter || 100 }
+    }
+    return {
+      contracts: parsed.contracts,
+      counter: parsed.counter || 100,
+    }
+  } catch {
+    return { contracts: SEED_CONTRACTS(), counter: 100 }
+  }
+}
+
+const initial = loadState()
+let contractIdCounter = initial.counter
 const generateCid = () => `mock-cid-${contractIdCounter++}`
+
+const persist = () => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      contracts: activeContracts,
+      counter: contractIdCounter,
+    }))
+  } catch {
+    // localStorage full or disabled — silently fail, mock still works in memory
+  }
+}
 
 // ─── Latency simulation ────────────────────────────────────
 // Real Canton sandbox transactions take 200-500ms. Without
@@ -40,8 +112,8 @@ export const MOCK_PARTIES = {
   },
 }
 
-// In-memory contract storage
-let activeContracts = []
+// In-memory contract storage (hydrated from localStorage on load)
+let activeContracts = initial.contracts
 
 // ─── Helpers ───────────────────────────────────────────────
 
@@ -52,6 +124,7 @@ const findContract = (cid) =>
 
 const archive = (cid) => {
   activeContracts = activeContracts.filter((c) => c.contractId !== cid)
+  persist()
 }
 
 const create = (template, payload) => {
@@ -62,8 +135,25 @@ const create = (template, payload) => {
     payload,
   }
   activeContracts.push(contract)
+  persist()
   return cid
 }
+
+// Helper to dedupe AcceptClaim/RejectClaim — both create a new
+// Invoice with identical structure, only amount/details differ.
+const createSettlementInvoice = (dispute, amount, details) =>
+  create('Invoice', {
+    shipper: dispute.payload.shipper,
+    carrier: dispute.payload.carrier,
+    origin: dispute.payload.origin,
+    destination: dispute.payload.destination,
+    cargoType: dispute.payload.cargoType,
+    weightKg: dispute.payload.weightKg,
+    amount,
+    details,
+    isPaid: false,
+    createdAt: nowIso(),
+  })
 
 // ─── Public API (matches ledger.js) ─────────────────────────
 
@@ -101,6 +191,9 @@ export const submitMockCommand = async (party, command) => {
 
   switch (choice) {
     case 'Accept': {
+      if (party !== c.payload.carrier) {
+        throw new Error('Only the carrier can accept this proposal')
+      }
       // ShipmentProposal → Shipment
       archive(contractId)
       const newCid = create('Shipment', { ...c.payload })
@@ -108,11 +201,17 @@ export const submitMockCommand = async (party, command) => {
     }
 
     case 'Reject': {
+      if (party !== c.payload.carrier) {
+        throw new Error('Only the carrier can reject this proposal')
+      }
       archive(contractId)
       return {}
     }
 
     case 'CreateInvoice': {
+      if (party !== c.payload.carrier) {
+        throw new Error('Only the carrier can create invoices')
+      }
       // Shipment → Invoice
       archive(contractId)
       const newCid = create('Invoice', {
@@ -131,6 +230,9 @@ export const submitMockCommand = async (party, command) => {
     }
 
     case 'MarkPaid': {
+      if (party !== c.payload.shipper) {
+        throw new Error('Only the shipper can mark invoices as paid')
+      }
       if (c.payload.isPaid) throw new Error('Invoice is already paid')
       archive(contractId)
       const newCid = create('Invoice', { ...c.payload, isPaid: true })
@@ -138,6 +240,9 @@ export const submitMockCommand = async (party, command) => {
     }
 
     case 'RaiseDispute': {
+      if (party !== c.payload.shipper) {
+        throw new Error('Only the shipper can raise a dispute')
+      }
       if (c.payload.isPaid) throw new Error('Cannot dispute a paid invoice')
       const claimed = parseFloat(argument.claimedAmount)
       if (claimed > parseFloat(c.payload.amount)) {
@@ -164,38 +269,30 @@ export const submitMockCommand = async (party, command) => {
     }
 
     case 'AcceptClaim': {
+      if (party !== c.payload.carrier) {
+        throw new Error('Only the carrier can resolve disputes')
+      }
       if (c.payload.status?.tag !== 'Open') throw new Error('Dispute already resolved')
       archive(contractId)
-      const newCid = create('Invoice', {
-        shipper: c.payload.shipper,
-        carrier: c.payload.carrier,
-        origin: c.payload.origin,
-        destination: c.payload.destination,
-        cargoType: c.payload.cargoType,
-        weightKg: c.payload.weightKg,
-        amount: c.payload.claimedAmount,
-        details: `Settlement after dispute: ${c.payload.reason}`,
-        isPaid: false,
-        createdAt: nowIso(),
-      })
+      const newCid = createSettlementInvoice(
+        c,
+        c.payload.claimedAmount,
+        `Settlement after dispute: ${c.payload.reason}`,
+      )
       return { contractId: newCid }
     }
 
     case 'RejectClaim': {
+      if (party !== c.payload.carrier) {
+        throw new Error('Only the carrier can resolve disputes')
+      }
       if (c.payload.status?.tag !== 'Open') throw new Error('Dispute already resolved')
       archive(contractId)
-      const newCid = create('Invoice', {
-        shipper: c.payload.shipper,
-        carrier: c.payload.carrier,
-        origin: c.payload.origin,
-        destination: c.payload.destination,
-        cargoType: c.payload.cargoType,
-        weightKg: c.payload.weightKg,
-        amount: c.payload.originalAmount,
-        details: c.payload.reason,
-        isPaid: false,
-        createdAt: nowIso(),
-      })
+      const newCid = createSettlementInvoice(
+        c,
+        c.payload.originalAmount,
+        `Dispute rejected; original amount stands. Reason: ${c.payload.reason}`,
+      )
       return { contractId: newCid }
     }
 
@@ -204,10 +301,15 @@ export const submitMockCommand = async (party, command) => {
   }
 }
 
-// Reset for demos (optional helper)
+// Reset for demos (optional helper). Clears localStorage too.
 export const resetMockLedger = () => {
   activeContracts = []
   contractIdCounter = 1
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // ignore
+  }
 }
 
 export const isMockMode = () =>

@@ -31,7 +31,9 @@ export default function DisputePanel({
           const original = parseFloat(d.fields.originalAmount)
           const claimed = parseFloat(d.fields.claimedAmount)
           const reduction = original - claimed
-          const reductionPct = ((reduction / original) * 100).toFixed(0)
+          const reductionPct = original > 0
+            ? ((reduction / original) * 100).toFixed(0)
+            : '0'
 
           return (
             <div key={d.contractId} className="card dispute">
