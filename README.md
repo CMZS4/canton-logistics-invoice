@@ -1,7 +1,9 @@
 # ChainFreight
 
 **Stop reconciling spreadsheets. Start agreeing on a single source of truth.**
-
+> 🌐 **Live demo:** https://canton-logistics-invoice.vercel.app  
+> 📺 **Demo video:** https://youtu.be/HT-yrPHfErk *(re-record in progress)*  
+> 🛠 **Repo:** https://github.com/CMZS4/canton-logistics-invoice
 Tamper-proof shipment & invoice workflow on Canton Network — proof, not promises.
 
 > HackCanton League Season #1 — RWA & Business Workflows Track
