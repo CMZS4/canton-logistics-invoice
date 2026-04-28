@@ -6,6 +6,8 @@
 // ═══════════════════════════════════════════════════════════
 
 import { currencySymbol } from '../lib/ledger'
+import ContractModal from './ContractModal'
+import { useState } from 'react'
 
 export default function CarrierPanel({
   proposals,
@@ -15,8 +17,16 @@ export default function CarrierPanel({
   onCreateInvoice,
   loading
 }) {
+  const [selectedContract, setSelectedContract] = useState(null)
+
   return (
     <div className="panel">
+      {selectedContract && (
+        <ContractModal
+          contract={selectedContract}
+          onClose={() => setSelectedContract(null)}
+        />
+      )}
       <h2>Incoming Proposals ({proposals.length})</h2>
       <div className="list">
         {proposals.length === 0 && <p className="empty">No pending proposals.</p>}
@@ -36,6 +46,12 @@ export default function CarrierPanel({
               <p className="card-notes">"{p.fields.details}"</p>
             )}
             <p className="ledger-id">⛓ Contract: {p.contractId.slice(0, 20)}…</p>
+            <button
+              className="btn-details"
+              onClick={() => setSelectedContract(p)}
+            >
+              🔍 View contract details
+            </button>
             <div className="card-actions">
               <button
                 onClick={() => onAccept(p.contractId)}
@@ -71,6 +87,12 @@ export default function CarrierPanel({
             <p>Shipper: Murat Logistics Inc.</p>
             <p>Amount: {currencySymbol(s.fields.currency)}{parseFloat(s.fields.price).toLocaleString('en-US')}</p>
             <p className="ledger-id">⛓ Contract: {s.contractId.slice(0, 20)}…</p>
+            <button
+              className="btn-details"
+              onClick={() => setSelectedContract(s)}
+            >
+              🔍 View contract details
+            </button>
             <button onClick={() => onCreateInvoice(s.contractId)} disabled={loading}>
               {loading ? 'Processing…' : '📄 Create Invoice'}
             </button>

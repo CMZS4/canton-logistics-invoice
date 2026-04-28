@@ -8,6 +8,8 @@
 // ═══════════════════════════════════════════════════════════
 
 import { currencySymbol } from '../lib/ledger'
+import ContractModal from './ContractModal'
+import { useState } from 'react'
 
 export default function DisputePanel({
   disputes,
@@ -16,8 +18,16 @@ export default function DisputePanel({
   onRejectClaim,
   loading
 }) {
+  const [selectedContract, setSelectedContract] = useState(null)
+
   return (
     <div className="panel">
+      {selectedContract && (
+        <ContractModal
+          contract={selectedContract}
+          onClose={() => setSelectedContract(null)}
+        />
+      )}
       <h2>⚠️ Disputes ({disputes.length})</h2>
       <p className="dash-sub">
         {isShipper
@@ -75,6 +85,12 @@ export default function DisputePanel({
               </p>
 
               <p className="ledger-id">⛓ Contract: {d.contractId.slice(0, 20)}…</p>
+              <button
+                className="btn-details"
+                onClick={() => setSelectedContract(d)}
+              >
+                🔍 View contract details
+              </button>
 
               {!isShipper && (
                 <div className="card-actions">

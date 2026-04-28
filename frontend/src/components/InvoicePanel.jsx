@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { currencySymbol } from '../lib/ledger'
+import ContractModal from './ContractModal'
 
 // ═══════════════════════════════════════════════════════════
 // INVOICE PANEL
@@ -7,8 +9,6 @@ import { useState } from 'react'
 // or Raise a Dispute. Carrier sees the waiting state.
 // ═══════════════════════════════════════════════════════════
 
-import { currencySymbol } from '../lib/ledger'
-
 export default function InvoicePanel({
   invoices,
   isShipper,
@@ -16,6 +16,7 @@ export default function InvoicePanel({
   onRaiseDispute,
   loading
 }) {
+  const [selectedContract, setSelectedContract] = useState(null)
   const [disputingId, setDisputingId] = useState(null)
   const [reason, setReason] = useState('')
   const [claimedAmount, setClaimedAmount] = useState('')
@@ -42,6 +43,12 @@ export default function InvoicePanel({
 
   return (
     <div className="panel">
+      {selectedContract && (
+        <ContractModal
+          contract={selectedContract}
+          onClose={() => setSelectedContract(null)}
+        />
+      )}
       <h2>Invoices ({invoices.length})</h2>
       <div className="list">
         {invoices.length === 0 && <p className="empty">No invoices yet.</p>}
@@ -73,6 +80,12 @@ export default function InvoicePanel({
                 <p className="card-notes">"{inv.fields.details}"</p>
               )}
               <p className="ledger-id">⛓ Contract: {inv.contractId.slice(0, 20)}…</p>
+              <button
+                className="btn-details"
+                onClick={() => setSelectedContract(inv)}
+              >
+                🔍 View contract details
+              </button>
 
               {/* Action area */}
               {!paid && isShipper && !isDisputingThis && (

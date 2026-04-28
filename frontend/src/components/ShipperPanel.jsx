@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { currencySymbol } from '../lib/ledger'
+import ContractModal from './ContractModal'
 
 // ═══════════════════════════════════════════════════════════
 // SHIPPER PANEL
@@ -9,6 +10,7 @@ import { currencySymbol } from '../lib/ledger'
 // ═══════════════════════════════════════════════════════════
 
 export default function ShipperPanel({ proposals, onCreate, loading }) {
+  const [selectedContract, setSelectedContract] = useState(null)
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [cargoType, setCargoType] = useState('')
@@ -38,6 +40,12 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
 
   return (
     <div className="panel">
+      {selectedContract && (
+        <ContractModal
+          contract={selectedContract}
+          onClose={() => setSelectedContract(null)}
+        />
+      )}
       <h2>Create New Shipment Proposal</h2>
       <div className="form-grid">
         <input
@@ -120,6 +128,12 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
               <p className="card-notes">"{p.fields.details}"</p>
             )}
             <p className="ledger-id">⛓ Contract: {p.contractId.slice(0, 20)}…</p>
+            <button
+              className="btn-details"
+              onClick={() => setSelectedContract(p)}
+            >
+              🔍 View contract details
+            </button>
           </div>
         ))}
       </div>
