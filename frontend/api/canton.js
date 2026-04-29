@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   const LEDGER_URL = 'https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services'
   const token = (process.env.CANTON_ACCESS_TOKEN || '').trim()
-
+console.log('Token length:', token.length, 'First 10:', token.slice(0, 10))
   const url = req.url || '/'
   const path = url.replace(/^\/api\/canton/, '') || '/'
 
