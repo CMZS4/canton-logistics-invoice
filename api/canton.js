@@ -5,6 +5,15 @@ export default async function handler(req, res) {
   const url = req.url || '/'
   const path = url.replace(/^\/api\/canton/, '') || '/'
 
+  let bodyText = undefined
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    if (typeof req.body === 'string') {
+      bodyText = req.body
+    } else if (req.body) {
+      bodyText = JSON.stringify(req.body)
+    }
+  }
+
   try {
     const response = await fetch(`${LEDGER_URL}${path}`, {
       method: req.method,
@@ -12,9 +21,7 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: req.method !== 'GET' && req.body
-        ? JSON.stringify(req.body)
-        : undefined,
+      body: bodyText,
     })
 
     const text = await response.text()
