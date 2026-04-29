@@ -4,23 +4,9 @@ import Daml.Script
 import DA.Time
 import DA.Date
 
--- ═══════════════════════════════════════════════════════════
--- TYPES
--- ═══════════════════════════════════════════════════════════
-
--- Currently only Open is reachable; Dispute archives via
--- consuming AcceptClaim/RejectClaim choices rather than a
--- Resolved transition. Kept as a tagged union so future
--- non-consuming resolution paths can extend without breaking
--- the existing wire format.
 data DisputeStatus
   = Open
   deriving (Eq, Show)
-
-
--- ═══════════════════════════════════════════════════════════
--- SHIPMENT PROPOSAL
--- ═══════════════════════════════════════════════════════════
 
 template ShipmentProposal
   with
@@ -33,11 +19,7 @@ template ShipmentProposal
     price : Decimal
     details : Text
     createdAt : Time
-      -- NOTE: createdAt is set client-side by the submitter for
-      -- the hackathon MVP. For production, this should be hoisted
-      -- into an Initiate choice that calls getTime, removing the
-      -- ability for clients to backdate or postdate proposals.
-      -- See "Future Extensions" in README.
+    currency : Optional Text
   where
     signatory shipper
     observer carrier
@@ -57,16 +39,12 @@ template ShipmentProposal
           price = price
           details = details
           createdAt = createdAt
+          currency = currency
 
     choice Reject : ()
       controller carrier
       do
         return ()
-
-
--- ═══════════════════════════════════════════════════════════
--- SHIPMENT
--- ═══════════════════════════════════════════════════════════
 
 template Shipment
   with
@@ -79,7 +57,7 @@ template Shipment
     price : Decimal
     details : Text
     createdAt : Time
-      
+    currency : Optional Text
   where
     signatory shipper, carrier
 
@@ -97,15 +75,7 @@ template Shipment
           details = details
           isPaid = False
           createdAt = createdAt
-      
-
-
--- ═══════════════════════════════════════════════════════════
--- INVOICE
--- ═══════════════════════════════════════════════════════════
--- Co-signed by both parties. Shipper marks paid OR raises a
--- Dispute if the delivery had an issue.
--- ═══════════════════════════════════════════════════════════
+          currency = currency
 
 template Invoice
   with
@@ -119,7 +89,7 @@ template Invoice
     details : Text
     isPaid : Bool
     createdAt : Time
-      
+    currency : Optional Text
   where
     signatory carrier, shipper
 
@@ -130,7 +100,6 @@ template Invoice
       do
         assertMsg "Invoice is already paid" (not isPaid)
         create this with isPaid = True
-      
 
     choice RaiseDispute : ContractId Dispute
       with
@@ -154,11 +123,7 @@ template Invoice
           reason = reason
           status = Open
           createdAt = now
-
-
--- ═══════════════════════════════════════════════════════════
--- DISPUTE
--- ═══════════════════════════════════════════════════════════
+          currency = currency
 
 template Dispute
   with
@@ -173,13 +138,12 @@ template Dispute
     reason : Text
     status : DisputeStatus
     createdAt : Time
+    currency : Optional Text
   where
     signatory shipper, carrier
 
     ensure originalAmount > 0.0 && claimedAmount > 0.0
 
-    -- Carrier accepts the dispute → create a NEW invoice with
-    -- the reduced (claimed) amount. Shipper still has to pay it.
     choice AcceptClaim : ContractId Invoice
       controller carrier
       do
@@ -196,8 +160,8 @@ template Dispute
           details = "Settlement after dispute: " <> reason
           isPaid = False
           createdAt = now
+          currency = currency
 
-    -- Carrier rejects the claim → reissue the original invoice.
     choice RejectClaim : ContractId Invoice
       controller carrier
       do
@@ -214,16 +178,11 @@ template Dispute
           details = "Dispute rejected; original amount stands. Reason of dispute: " <> reason
           isPaid = False
           createdAt = now
-
-
--- ═══════════════════════════════════════════════════════════
--- TEST SCENARIOS
--- ═══════════════════════════════════════════════════════════
+          currency = currency
 
 testLogistics = script do
   shipper <- allocateParty "Shipper"
   carrier <- allocateParty "Carrier"
-
   proposalId <- submit shipper do
     createCmd ShipmentProposal with
       shipper = shipper
@@ -235,22 +194,18 @@ testLogistics = script do
       price = 5000.0
       details = "20ft Container - urgent"
       createdAt = (time (date 2026 May 1) 10 0 0)
-
+      currency = Some "USD"
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept
-
   invoiceId <- submit carrier do
     exerciseCmd shipmentId CreateInvoice
-
   submit shipper do
     exerciseCmd invoiceId MarkPaid
-
   pure ()
 
 testReject = script do
   shipper <- allocateParty "Shipper2"
   carrier <- allocateParty "Carrier2"
-
   proposalId <- submit shipper do
     createCmd ShipmentProposal with
       shipper = shipper
@@ -262,16 +217,14 @@ testReject = script do
       price = 8000.0
       details = "Reject scenario test"
       createdAt = (time (date 2026 May 1) 10 0 0)
-
+      currency = Some "USD"
   submit carrier do
     exerciseCmd proposalId Reject
-
   pure ()
 
 testDisputeAccepted = script do
   shipper <- allocateParty "Shipper3"
   carrier <- allocateParty "Carrier3"
-
   proposalId <- submit shipper do
     createCmd ShipmentProposal with
       shipper = shipper
@@ -283,33 +236,24 @@ testDisputeAccepted = script do
       price = 3000.0
       details = "Glass - dispute scenario"
       createdAt = (time (date 2026 May 1) 10 0 0)
-
+      currency = Some "USD"
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept
-
   invoiceId <- submit carrier do
     exerciseCmd shipmentId CreateInvoice
-
-  -- Shipper raises a dispute claiming partial damage
   disputeId <- submit shipper do
     exerciseCmd invoiceId RaiseDispute with
       reason = "30% of glass items arrived broken"
       claimedAmount = 2100.0
-
-  -- Carrier accepts the claim → reduced invoice
   reducedInvoiceId <- submit carrier do
     exerciseCmd disputeId AcceptClaim
-
-  -- Shipper pays the reduced amount
   submit shipper do
     exerciseCmd reducedInvoiceId MarkPaid
-
   pure ()
 
 testDisputeRejected = script do
   shipper <- allocateParty "Shipper4"
   carrier <- allocateParty "Carrier4"
-
   proposalId <- submit shipper do
     createCmd ShipmentProposal with
       shipper = shipper
@@ -321,31 +265,23 @@ testDisputeRejected = script do
       price = 2000.0
       details = "Textile bundle"
       createdAt = (time (date 2026 May 1) 10 0 0)
-
+      currency = Some "USD"
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept
-
   invoiceId <- submit carrier do
     exerciseCmd shipmentId CreateInvoice
-
   disputeId <- submit shipper do
     exerciseCmd invoiceId RaiseDispute with
       reason = "Late delivery"
       claimedAmount = 500.0
-
-  -- Carrier rejects the claim → original invoice reissued
   reissuedInvoiceId <- submit carrier do
     exerciseCmd disputeId RejectClaim
-
-  -- Shipper has to pay the original amount
   submit shipper do
     exerciseCmd reissuedInvoiceId MarkPaid
 
 testEdgeCases = script do
   shipper <- allocateParty "Shipper5"
   carrier <- allocateParty "Carrier5"
-
-  -- Setup: create a normal invoice
   proposalId <- submit shipper do
     createCmd ShipmentProposal with
       shipper = shipper
@@ -357,36 +293,25 @@ testEdgeCases = script do
       price = 1500.0
       details = "Edge case scenarios"
       createdAt = (time (date 2026 May 1) 10 0 0)
-
+      currency = Some "USD"
   shipmentId <- submit carrier do
     exerciseCmd proposalId Accept
-
   invoiceId <- submit carrier do
     exerciseCmd shipmentId CreateInvoice
-
-  -- Edge case 1: Cannot claim more than the invoice amount
   submitMustFail shipper do
     exerciseCmd invoiceId RaiseDispute with
       reason = "Trying to over-claim"
       claimedAmount = 9999.0
-
-  -- Edge case 2: Cannot claim a negative or zero amount
   submitMustFail shipper do
     exerciseCmd invoiceId RaiseDispute with
       reason = "Trying to claim zero"
       claimedAmount = 0.0
-
-  -- Edge case 3: Pay the invoice, then try to dispute it
   paidInvoiceId <- submit shipper do
     exerciseCmd invoiceId MarkPaid
-
   submitMustFail shipper do
     exerciseCmd paidInvoiceId RaiseDispute with
       reason = "Trying to dispute a paid invoice"
       claimedAmount = 500.0
-
-  -- Edge case 4: Cannot pay an already-paid invoice
   submitMustFail shipper do
     exerciseCmd paidInvoiceId MarkPaid
-
   pure ()

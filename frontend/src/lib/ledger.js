@@ -119,7 +119,7 @@ export async function queryContracts(asParty) {
         },
       },
       verbose: true,
-      activeAtOffset: offset,
+      activeAtOffset: offset.toString(),
     }),
   })
   return data || []
