@@ -25,7 +25,10 @@ export default function RoleSelector({ onSelect }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const byHint = (hint) => parties.find(p => p.party.startsWith(hint + '::'))
+  const byHint = (hint) => parties.find(p =>
+    p.party.startsWith(hint + '::') ||
+    p.party.startsWith('ChainFreight' + hint + '::')
+  )
 
   const shipper = byHint('Shipper')
   const carrier = byHint('Carrier')

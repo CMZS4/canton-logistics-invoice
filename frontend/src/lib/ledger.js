@@ -62,8 +62,17 @@ export async function fetchParties() {
   if (isMockMode()) {
     return await getMockParties()
   }
-  const data = await fetchJson(`${API_BASE}/v2/parties`)
-  return data.partyDetails || []
+  // Devnet: parties are hardcoded — /v2/parties requires admin rights
+  return [
+    {
+      party: 'ChainFreightShipper::1220195a56748e538153ecc527422256c235ff27b367483b04e161d3bbc62b1ebf32',
+      displayName: 'ChainFreightShipper',
+    },
+    {
+      party: 'ChainFreightCarrier::1220195a56748e538153ecc527422256c235ff27b367483b04e161d3bbc62b1ebf32',
+      displayName: 'ChainFreightCarrier',
+    },
+  ]
 }
 
 export async function getLedgerEnd() {

@@ -50,7 +50,8 @@ function App() {
     fetchParties().then(list => {
       const other = list.find(p => {
         const wantedHint = session.role === 'shipper' ? 'Carrier' : 'Shipper'
-        return p.party.startsWith(wantedHint + '::')
+        return p.party.startsWith(wantedHint + '::') ||
+               p.party.startsWith('ChainFreight' + wantedHint + '::')
       })
       if (other) setCounterparty(other.party)
     })
