@@ -34,7 +34,7 @@ const cmdId = () =>
 // "Cannot read property X of undefined" because we'd try to
 // parse error responses as if they were successful JSON.
 // Mock mode bypasses this entirely — see isMockMode() branches.
-const FETCH_TIMEOUT_MS = 5000
+const FETCH_TIMEOUT_MS = 30000
 
 async function fetchJson(url, options = {}) {
   const controller = new AbortController()
