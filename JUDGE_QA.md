@@ -1,3 +1,8 @@
+# > ⚠️ **Updated: April 29, 2026** — ChainFreight is now live on Canton devnet.
+> Mock mode is the fallback deployment surface, not the primary story.
+
+---
+
 # ChainFreight — Judge Q&A Reference
 
 A pre-prepared Q&A reference covering architecture choices, ledger selection, mock mode rationale, and validation status.
@@ -43,9 +48,14 @@ If pressed: It’s a demo-layer equivalence, not cryptographic security — the 
 
 8) Devnet deployment status
 Q: Is it deployed to devnet?
-A: Not yet — devnet deployment is in progress with support from mrlp4_noders. We prioritized a stable demo path and honest workflow fidelity first, because a shaky deploy would create more risk than value this close to submission.
-If pressed: The submission is already functional locally and via the mock static deployment; devnet is a bonus, not a dependency for the core story.
+**A:** Yes — ChainFreight is connected to Canton devnet and executing 
+the full workflow on real ledger transactions. We onboarded parties 
+(ChainFreightShipper, ChainFreightCarrier), authenticated through 
+Keycloak OIDC, and ran proposal → accept → invoice → dispute → 
+settlement on devnet.
 
+**If pressed:** Mock mode still exists for static deployment reliability, 
+but the live path is real Canton devnet — not a simulation.
 9) Proof of Delivery absence
 Q: Why didn’t you add Proof of Delivery?
 A: We evaluated it and decided it was a deliberate trade-off. The current proposal → accept → invoice → dispute → settle flow already proves the core coordination problem, and PoD would have added complexity and demo risk for limited judge value.
