@@ -23,7 +23,7 @@ import {
   MOCK_PARTIES,
 } from './mockLedger'
 
-const API_BASE = ''
+const API_BASE = import.meta.env.VITE_LEDGER_BASE_URL || ''
 
 const cmdId = () =>
   `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
