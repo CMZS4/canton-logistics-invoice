@@ -388,7 +388,89 @@ A database automates your version of the truth.
 Canton lets multiple parties agree on a shared truth — with cryptographic signatures, selective disclosure, and a state machine that no single party can rewrite.
 
 That's the difference between automating a workflow and trusting it.
+## Architecture & Engineering Trade-offs
 
+### Current architecture
+
+In this prototype, UI components interact directly with ledger primitives (`submitCommand`, `queryContracts`). The project was built solo in a 21-day hackathon, with a fixed contract surface (4 templates), limited scope, and a strong focus on delivering a working, end-to-end demo.
+
+Instead of introducing additional layers prematurely, the implementation prioritizes:
+
+- clarity,
+- speed of iteration,
+- and full visibility into ledger interactions.
+
+### Known limitation: UI–Ledger coupling
+
+The current design couples the UI layer to Daml ledger semantics:
+
+- UI is aware of `templateId`, `choice`, and contract payload structure
+- Some role detection relies on naming conventions (e.g. `startsWith`)
+
+This is intentional and accepted within the hackathon scope.
+
+### What would change in production
+
+For a production system, the architecture would evolve into:
+UI → Domain Layer → Adapter → Ledger
+
+**Domain layer** — A `domain/` module exposing business-level actions:
+
+- `createShipment(data)`
+- `acceptShipment(id)`
+- `raiseDispute(id)`
+- `settleInvoice(id)`
+
+The UI would depend only on these functions — not on ledger primitives.
+
+**Adapter layer** — An `adapter/` module responsible for:
+
+- mapping Daml contracts → UI-friendly view models
+- hiding `templateId`, `choice`, and raw payload structures
+
+Example view model:
+
+```js
+{
+  id,
+  amount,
+  currency,
+  status,
+  counterparty
+}
+```
+
+**Typed party registry** — Replacing string-based heuristics like `startsWith("Carrier::")` with explicit role definitions.
+
+### Why this abstraction is not implemented yet
+
+This abstraction is intentionally deferred due to:
+
+1. **Stable contract schema** — The contract model is fixed for the hackathon duration, so change-resilience provides limited short-term value.
+2. **Small, controlled surface area** — Each panel is compact, and the total system complexity is low.
+3. **Time-to-demo priority** — With a strict deadline, introducing additional layers increases risk without improving the demo outcome.
+
+### Design philosophy
+
+This project favors **explicit coupling over premature abstraction**.
+
+The goal is to demonstrate:
+
+- the correctness of the workflow,
+- the value of a shared ledger,
+- and the multi-party agreement model.
+
+The next step would be to formalize this into a production-ready architecture.
+
+### Summary
+
+| Aspect | Current system | Production system |
+|--------|---------------|-------------------|
+| **Optimized for** | delivery speed, clarity | decoupling, evolution |
+| **Coupling** | UI ↔ Ledger | UI ↔ Domain ↔ Adapter ↔ Ledger |
+| **Refactor cost** | low (small surface) | one-time investment |
+
+This trade-off is deliberate. Hiding the coupling behind premature abstraction would have made the demo no clearer to judges, while introducing real risk of breaking it before submission.
 ## What's Real, What's Next
 
 **Live today:**
