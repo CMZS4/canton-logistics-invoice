@@ -158,7 +158,7 @@ export async function submitCommand(asParty, commands) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      userId: 'chainfreight',
+      userId: 'cd28ef1b-7766-4098-b9dd-b46d8b399d8a',
       commandId: cmdId(),
       actAs: [asParty],
       commands,
