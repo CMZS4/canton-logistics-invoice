@@ -1,7 +1,32 @@
+let cachedToken = null
+let tokenExpiry = 0
+
+async function getAccessToken() {
+  if (cachedToken && Date.now() < tokenExpiry - 60000) {
+    return cachedToken
+  }
+  const res = await fetch(
+    'https://keycloak.naas.noders.services/realms/noders-appsfactory/protocol/openid-connect/token',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: 'web-app-ui-hackcanton-01-devnet',
+        refresh_token: process.env.CANTON_REFRESH_TOKEN || '',
+      }),
+    }
+  )
+  const data = await res.json()
+  cachedToken = data.access_token
+  tokenExpiry = Date.now() + (data.expires_in * 1000)
+  return cachedToken
+}
+
 export default async function handler(req, res) {
   const LEDGER_URL = 'https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services'
-  const token = (process.env.CANTON_ACCESS_TOKEN || '').trim()
-console.log('Token length:', token.length, 'First 10:', token.slice(0, 10))
+  const token = await getAccessToken()
+
   const url = req.url || '/'
   const path = url.replace(/^\/api\/canton/, '') || '/'
 
