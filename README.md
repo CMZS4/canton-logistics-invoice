@@ -5,7 +5,7 @@
 > 📺 **Demo video:** https://youtu.be/HT-yrPHfErk *(re-record in progress)*  
 > 🛠 **Repo:** https://github.com/CMZS4/canton-logistics-invoice
 Tamper-proof shipment & invoice workflow on Canton Network — proof, not promises.
-
+> 📋 **For judges:** [Q&A Reference](./JUDGE_QA.md) — pre-answered questions on architecture, ledger choice, mock mode, and validation status.
 > HackCanton League Season #1 — RWA & Business Workflows Track
 
 [![Daml Tests](https://img.shields.io/badge/daml%20tests-5%20passing-success?style=flat-square)]()
