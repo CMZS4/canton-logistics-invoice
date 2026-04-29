@@ -1,9 +1,10 @@
 export default async function handler(req, res) {
   const LEDGER_URL = 'https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services'
-  const token = process.env.CANTON_ACCESS_TOKEN
+  const token = (process.env.CANTON_ACCESS_TOKEN || '').trim()
 
-  const path = req.url.replace('/api/canton', '') || '/'
-  
+  const url = req.url || '/'
+  const path = url.replace(/^\/api\/canton/, '') || '/'
+
   try {
     const response = await fetch(`${LEDGER_URL}${path}`, {
       method: req.method,
@@ -11,11 +12,18 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
+      body: req.method !== 'GET' && req.body
+        ? JSON.stringify(req.body)
+        : undefined,
     })
 
-    const data = await response.json()
-    res.status(response.status).json(data)
+    const text = await response.text()
+    try {
+      const data = JSON.parse(text)
+      res.status(response.status).json(data)
+    } catch {
+      res.status(response.status).send(text)
+    }
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
