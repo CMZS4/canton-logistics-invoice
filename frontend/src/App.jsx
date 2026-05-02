@@ -11,6 +11,7 @@ import {
 } from './lib/ledger'
 
 import RoleSelector from './components/RoleSelector'
+import { logEvent, EVENT_LABELS, setWorkflowId as saveWorkflowId } from './lib/eventLog'
 import ShipperPanel from './components/ShipperPanel'
 import CarrierPanel from './components/CarrierPanel'
 import InvoicePanel from './components/InvoicePanel'
@@ -37,6 +38,7 @@ function App() {
   const [contracts, setContracts] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [workflowId, setWorkflowId] = useState(null)
 
   // Persist session
   useEffect(() => {
@@ -86,7 +88,7 @@ function App() {
     setLoading(true)
     const t = toast.loading('Creating proposal on ledger…')
     try {
-      await submitCommand(session.partyId, [{
+      const result = await submitCommand(session.partyId, [{
         CreateCommand: {
           templateId: '#chainfreight:Logistics:ShipmentProposal',
           createArguments: {
@@ -103,6 +105,11 @@ function App() {
           }
         }
       }])
+      if (result?.contractId) {
+        setWorkflowId(result.contractId)
+        saveWorkflowId(result.contractId)
+        logEvent(result.contractId, EVENT_LABELS.PROPOSAL_CREATED, session.role, { origin: input.origin, destination: input.destination, price: input.price, currency: input.currency })
+      }
       await refresh()
       toast.success('Proposal created on ledger', { id: t })
     } catch (e) {
@@ -126,6 +133,7 @@ function App() {
         }
       }])
       await refresh()
+      logEvent(contractId, EVENT_LABELS.PROPOSAL_REJECTED, session.role, {})
       toast.success('Proposal rejected', { id: t })
     } catch (e) {
       toast.error(`Reject failed: ${e.message}`, { id: t })
@@ -148,6 +156,7 @@ function App() {
         }
       }])
       await refresh()
+      if (workflowId) logEvent(workflowId, EVENT_LABELS.PROPOSAL_ACCEPTED, session.role, {})
       toast.success('Shipment accepted — contract created', { id: t })
     } catch (e) {
       toast.error(`Accept failed: ${e.message}`, { id: t })
@@ -170,6 +179,7 @@ function App() {
         }
       }])
       await refresh()
+      if (workflowId) logEvent(workflowId, EVENT_LABELS.INVOICE_CREATED, session.role, {})
       toast.success('Invoice created', { id: t })
     } catch (e) {
       toast.error(`Create invoice failed: ${e.message}`, { id: t })
@@ -194,7 +204,9 @@ function App() {
           }
         }
       }])
-      await refresh()
+      
+    await refresh()
+      if (workflowId) logEvent(workflowId, EVENT_LABELS.DISPUTE_RAISED, session.role, { reason, claimedAmount })
       toast.success('Dispute raised — awaiting carrier response', { id: t })
     } catch (e) {
       toast.error(`Dispute failed: ${e.message}`, { id: t })
@@ -217,6 +229,7 @@ function App() {
         }
       }])
       await refresh()
+      if (workflowId) logEvent(workflowId, EVENT_LABELS.CLAIM_ACCEPTED, session.role, {})
       toast.success('Claim accepted — reduced invoice issued', { id: t })
     } catch (e) {
       toast.error(`Accept claim failed: ${e.message}`, { id: t })
@@ -239,6 +252,7 @@ function App() {
         }
       }])
       await refresh()
+      if (workflowId) logEvent(workflowId, EVENT_LABELS.CLAIM_REJECTED, session.role, {})
       toast.success('Claim rejected — original amount stands', { id: t })
     } catch (e) {
       toast.error(`Reject claim failed: ${e.message}`, { id: t })
@@ -261,6 +275,7 @@ function App() {
         }
       }])
       await refresh()
+      if (workflowId) logEvent(workflowId, EVENT_LABELS.INVOICE_PAID, session.role, {})
       toast.success('Invoice marked as paid ✓', { id: t })
     } catch (e) {
       toast.error(`Mark paid failed: ${e.message}`, { id: t })

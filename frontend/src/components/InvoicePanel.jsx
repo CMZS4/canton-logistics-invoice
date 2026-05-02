@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { currencySymbol } from '../lib/ledger'
 import ContractModal from './ContractModal'
+import TimelineModal from './TimelineModal'
 
 // ═══════════════════════════════════════════════════════════
 // INVOICE PANEL
@@ -17,6 +18,7 @@ export default function InvoicePanel({
   loading
 }) {
   const [selectedContract, setSelectedContract] = useState(null)
+  const [timelineContract, setTimelineContract] = useState(null)
   const [disputingId, setDisputingId] = useState(null)
   const [reason, setReason] = useState('')
   const [claimedAmount, setClaimedAmount] = useState('')
@@ -47,6 +49,12 @@ export default function InvoicePanel({
         <ContractModal
           contract={selectedContract}
           onClose={() => setSelectedContract(null)}
+        />
+      )}
+      {timelineContract && (
+        <TimelineModal
+          contract={timelineContract}
+          onClose={() => setTimelineContract(null)}
         />
       )}
       <h2>Invoices ({invoices.length})</h2>
@@ -85,6 +93,12 @@ export default function InvoicePanel({
                 onClick={() => setSelectedContract(inv)}
               >
                 🔍 View contract details
+              </button>
+              <button
+                className="btn-timeline"
+                onClick={() => setTimelineContract(inv)}
+              >
+                📜 View timeline
               </button>
 
               {/* Action area */}

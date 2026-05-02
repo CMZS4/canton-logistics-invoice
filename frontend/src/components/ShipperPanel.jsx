@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { currencySymbol } from '../lib/ledger'
 import ContractModal from './ContractModal'
+import TimelineModal from './TimelineModal'
 
 // ═══════════════════════════════════════════════════════════
 // SHIPPER PANEL
@@ -11,6 +12,7 @@ import ContractModal from './ContractModal'
 
 export default function ShipperPanel({ proposals, onCreate, loading }) {
   const [selectedContract, setSelectedContract] = useState(null)
+  const [timelineContract, setTimelineContract] = useState(null)
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [cargoType, setCargoType] = useState('')
@@ -44,6 +46,12 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
         <ContractModal
           contract={selectedContract}
           onClose={() => setSelectedContract(null)}
+        />
+      )}
+      {timelineContract && (
+        <TimelineModal
+          contract={timelineContract}
+          onClose={() => setTimelineContract(null)}
         />
       )}
       <h2>Create New Shipment Proposal</h2>
@@ -133,6 +141,12 @@ export default function ShipperPanel({ proposals, onCreate, loading }) {
               onClick={() => setSelectedContract(p)}
             >
               🔍 View contract details
+            </button>
+            <button
+              className="btn-timeline"
+              onClick={() => setTimelineContract(p)}
+            >
+              📜 View timeline
             </button>
           </div>
         ))}

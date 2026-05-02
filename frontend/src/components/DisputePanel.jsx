@@ -9,6 +9,7 @@
 
 import { currencySymbol } from '../lib/ledger'
 import ContractModal from './ContractModal'
+import TimelineModal from './TimelineModal'
 import { useState } from 'react'
 
 export default function DisputePanel({
@@ -19,6 +20,7 @@ export default function DisputePanel({
   loading
 }) {
   const [selectedContract, setSelectedContract] = useState(null)
+  const [timelineContract, setTimelineContract] = useState(null)
 
   return (
     <div className="panel">
@@ -26,6 +28,12 @@ export default function DisputePanel({
         <ContractModal
           contract={selectedContract}
           onClose={() => setSelectedContract(null)}
+        />
+      )}
+      {timelineContract && (
+        <TimelineModal
+          contract={timelineContract}
+          onClose={() => setTimelineContract(null)}
         />
       )}
       <h2>⚠️ Disputes ({disputes.length})</h2>
@@ -90,6 +98,12 @@ export default function DisputePanel({
                 onClick={() => setSelectedContract(d)}
               >
                 🔍 View contract details
+              </button>
+              <button
+                className="btn-timeline"
+                onClick={() => setTimelineContract(d)}
+              >
+                📜 View timeline
               </button>
 
               {!isShipper && (
