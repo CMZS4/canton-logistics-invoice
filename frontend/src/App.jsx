@@ -105,6 +105,7 @@ function App() {
           }
         }
       }])
+      console.log('submitCommand result:', JSON.stringify(result))
       if (result?.contractId) {
         setWorkflowId(result.contractId)
         saveWorkflowId(result.contractId)
