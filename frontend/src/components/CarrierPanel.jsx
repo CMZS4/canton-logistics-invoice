@@ -7,6 +7,7 @@
 
 import { currencySymbol } from '../lib/ledger'
 import ContractModal from './ContractModal'
+import TimelineModal from './TimelineModal'
 import { useState } from 'react'
 
 export default function CarrierPanel({
@@ -18,6 +19,7 @@ export default function CarrierPanel({
   loading
 }) {
   const [selectedContract, setSelectedContract] = useState(null)
+  const [timelineContract, setTimelineContract] = useState(null)
 
   return (
     <div className="panel">
@@ -25,6 +27,12 @@ export default function CarrierPanel({
         <ContractModal
           contract={selectedContract}
           onClose={() => setSelectedContract(null)}
+        />
+      )}
+      {timelineContract && (
+        <TimelineModal
+          contract={timelineContract}
+          onClose={() => setTimelineContract(null)}
         />
       )}
       <h2>Incoming Proposals ({proposals.length})</h2>
@@ -51,6 +59,12 @@ export default function CarrierPanel({
               onClick={() => setSelectedContract(p)}
             >
               🔍 View contract details
+            </button>
+            <button
+              className="btn-timeline"
+              onClick={() => setTimelineContract(p)}
+            >
+              📜 View timeline
             </button>
             <div className="card-actions">
               <button
@@ -92,6 +106,12 @@ export default function CarrierPanel({
               onClick={() => setSelectedContract(s)}
             >
               🔍 View contract details
+            </button>
+            <button
+              className="btn-timeline"
+              onClick={() => setTimelineContract(s)}
+            >
+              📜 View timeline
             </button>
             <button onClick={() => onCreateInvoice(s.contractId)} disabled={loading}>
               {loading ? 'Processing…' : '📄 Create Invoice'}
