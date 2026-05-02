@@ -38,7 +38,9 @@ function App() {
   const [contracts, setContracts] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [workflowId, setWorkflowId] = useState(null)
+  const [workflowId, setWorkflowId] = useState(() => {
+    try { return localStorage.getItem('chainfreight_workflow_id') } catch { return null }
+  })
 
   // Persist session
   useEffect(() => {
@@ -105,11 +107,11 @@ function App() {
           }
         }
       }])
-      console.log('submitCommand result:', JSON.stringify(result))
-      if (result?.contractId) {
-        setWorkflowId(result.contractId)
-        saveWorkflowId(result.contractId)
-        logEvent(result.contractId, EVENT_LABELS.PROPOSAL_CREATED, session.role, { origin: input.origin, destination: input.destination, price: input.price, currency: input.currency })
+      const wfId = result?.contractId || result?.updateId
+      if (wfId) {
+        setWorkflowId(wfId)
+        saveWorkflowId(wfId)
+        logEvent(wfId, EVENT_LABELS.PROPOSAL_CREATED, session.role, { origin: input.origin, destination: input.destination, price: input.price, currency: input.currency })
       }
       await refresh()
       toast.success('Proposal created on ledger', { id: t })
