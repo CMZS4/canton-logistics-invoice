@@ -1,5 +1,5 @@
 # ChainFreight
-
+> 👤 **Built solo in 21 days** for HackCanton League Season #1 — RWA & Business Workflows Track.
 **Stop reconciling spreadsheets. Start agreeing on a single source of truth.**
 > 🌐 **Live demo:** https://canton-logistics-invoice.vercel.app  
 > 📺 **Demo video:** https://youtu.be/HT-yrPHfErk *(re-record in progress)*  
