@@ -2,7 +2,7 @@
 > 👤 **Built solo in 21 days** for HackCanton League Season #1 — RWA & Business Workflows Track.
 **Stop reconciling spreadsheets. Start agreeing on a single source of truth.**
 > 🌐 **Live demo:** https://canton-logistics-invoice.vercel.app  
-> 📺 **Demo video:** https://youtu.be/HT-yrPHfErk *(re-record in progress)*  
+> 📺 **Demo video:** https://youtu.be/H3AzUO3G7lU  
 > 🛠 **Repo:** https://github.com/CMZS4/canton-logistics-invoice
 Tamper-proof shipment & invoice workflow on Canton Network — proof, not promises.
 
