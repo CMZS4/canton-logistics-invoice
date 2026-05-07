@@ -352,8 +352,6 @@ What you'll see in the live demo:
 - [x] Structured shipment data (origin, destination, cargoType, weightKg)
 - [x] Type-safe dispute status (Daml ADT, not string)
 - [x] Submission demo video (older version — to be re-recorded)
-- [ ] Live web deployment (Vercel)
-- [ ] Production deployment (Canton devnet)
 - [ ] Pilot with real freight forwarder
 
 ---
@@ -483,7 +481,7 @@ This trade-off is deliberate. Hiding the coupling behind premature abstraction w
 - Real-time analytics dashboard derived from active contracts
 
 **Next:**
-- Deploy to Canton devnet (live network)
+Live on Canton devnet hackcanton-01
 - Pilot with one real freight forwarder for production validation
 
 ## Future Extensions
@@ -520,7 +518,6 @@ We list these explicitly because they matter for any production conversation:
 
 - **Polling, not streaming.** The UI refreshes via `/v2/state/active-contracts` every 3 seconds. For production, Canton's gRPC streaming or PQS-backed subscriptions would replace polling.
 - **`details: Text` payload.** Shipment details are intentionally a free-text field for the hackathon. A production schema would split origin, destination, INCO terms, weight, and cargo type into typed fields.
-- **Single sandbox, single domain.** No devnet deployment yet. The same Daml package is deploy-ready for Canton devnet; the work is operational, not architectural.
 
 ## License
 
